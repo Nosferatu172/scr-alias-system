@@ -1,0 +1,9 @@
+{
+  "cookies_dir": "/mnt/c/scr/keys/cookies/",
+  "default_music_dir": "/mnt/d/Music/clm/hold/",
+  "default_videos_dir": "/mnt/d/Music/clm/Videos/hold/",
+  "music_artist_dir": "/mnt/d/Music/clm/org/",
+  "video_artist_dir": "/mnt/d/Music/clm/Videos/org/",
+  "brave_export_dir": "/mnt/c/scr/keys/tabs/brave/",
+  "passwords_file": "/mnt/c/scr/keys/passwords.txt"
+}

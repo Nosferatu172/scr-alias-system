@@ -1,0 +1,178 @@
+# =========================================================================================
+# [ Custom Commands Available ]
+# =========================================================================================
+# Created By: Tyler Jensen
+# Email: tylerjensen5@yahoo.com
+# Date: 01/31/2026
+# Version: 01/22/0001
+# =======================================================================================
+# To View Commands Type In "als."
+# =======================================================================================
+# Commands to find this Page:
+# [als]
+alias alsgraph="cat /mnt/c/scr/aliases/lib/als-controls"
+alias e-alsgraph="nano /mnt/c/scr/aliases/lib/als-controls"
+# [/als]
+# ---------------------------------------------------------------------------------------
+# Commands:
+# ---------------------------------------------------------------------------------------
+# [als-graph]
+als.graph() {
+  local name="${1:-}"
+  local dir="/mnt/c/scr/aliases/lib"
+  local show_all="0"
+
+  if [[ -z "$name" || "$name" == "-h" || "$name" == "--help" || "$name" == "help" ]]; then
+    cat <<'USAGE'
+als.graph — explain where an alias/function comes from
+
+Usage:
+  als.graph <name>         Show where <name> is defined
+  als.graph <name> --all   Show ALL open section tags at match line
+
+Examples:
+  als.graph vpy
+  als.graph vpy-m
+  als.graph Uvpy
+  als.graph als.sections
+  als.graph dt
+USAGE
+    return 0
+  fi
+
+  [[ -d "$dir" ]] || { echo "❌ Missing dir: $dir"; return 1; }
+  [[ "${2:-}" == "--all" ]] && show_all="1"
+
+  # Collect matches using awk (zsh-safe; no regex escaping games)
+  local matches
+  matches="$(
+    awk -v TARGET="$name" '
+      function basename(p,  a,n) { n=split(p,a,"/"); return a[n] }
+
+      # track section tag stack
+      function open_tag(t)  { stack[t]=1; order[++n]=t }
+      function close_tag(t) { delete stack[t] }
+
+      function current_tags(   i,out) {
+        out=""
+        for (i=1;i<=n;i++) if (stack[order[i]]) out = out (out? " " : "") "[" order[i] "]"
+        return out
+      }
+
+      function nearest_tag(   i) {
+        # nearest open = last in order that is still open
+        for (i=n;i>=1;i--) if (stack[order[i]]) return "[" order[i] "]"
+        return ""
+      }
+
+      BEGIN { n=0 }
+
+      {
+        # exact tag: # [name]
+        if ($0 ~ /^# \[[A-Za-z0-9_.-]+\]$/) {
+          t=$0; sub(/^# \[/,"",t); sub(/\]$/,"",t)
+          open_tag(t)
+          next
+        }
+
+        # exact closing tag: # [/name]
+        if ($0 ~ /^# \[\/[A-Za-z0-9_.-]+\]$/) {
+          t=$0; sub(/^# \[\//,"",t); sub(/\]$/,"",t)
+          close_tag(t)
+          next
+        }
+
+        # alias: alias NAME=
+        if ($0 ~ /^[ \t]*alias[ \t]+/ ) {
+          line=$0
+          sub(/^[ \t]*alias[ \t]+/, "", line)
+          split(line, parts, "=")
+          aname=parts[1]
+          gsub(/[ \t]+$/, "", aname)
+
+          if (aname == TARGET) {
+            tags = (SHOW_ALL ? current_tags() : nearest_tag())
+            print FILENAME ":" NR ":alias:" $0 ":" (tags!="" ? tags : "(none)")
+          }
+          next
+        }
+
+        # function: NAME() {
+        if ($0 ~ /^[ \t]*[A-Za-z0-9_.-]+[ \t]*\(\)[ \t]*\{/ ) {
+          line=$0
+          sub(/^[ \t]*/, "", line)
+          sub(/[ \t]*\(\)[ \t]*\{.*/, "", line)
+          fname=line
+
+          if (fname == TARGET) {
+            tags = (SHOW_ALL ? current_tags() : nearest_tag())
+            print FILENAME ":" NR ":func:" $0 ":" (tags!="" ? tags : "(none)")
+          }
+          next
+        }
+      }
+    ' SHOW_ALL="$show_all" "$dir"/* 2>/dev/null
+  )"
+
+  if [[ -z "$matches" ]]; then
+    echo "❌ Not found: $name"
+    return 1
+  fi
+
+  echo "$name"
+  echo "────────────────────────────────────────"
+
+  # Print matches nicely
+  local count=0
+  while IFS= read -r m; do
+    [[ -z "$m" ]] && continue
+    count=$((count+1))
+
+    local file rest line type content section
+    file="${m%%:*}"
+    rest="${m#*:}"
+
+    line="${rest%%:*}"
+    rest="${rest#*:}"
+
+    type="${rest%%:*}"
+    rest="${rest#*:}"
+
+    # rest is: original_line:section
+    content="${rest%:*}"
+    section="${rest##*:}"
+
+    echo "• defined in: $(basename "$file"):$line  ($type)"
+    echo "  line: $content"
+    echo "  section: $section"
+
+    # variants (e-/c-/cd-) — use awk parsing again
+    local variants
+    variants="$(
+      awk -v TARGET="$name" '
+        /^[ \t]*alias[ \t]+(e-|c-|cd-)/ {
+          line=$0
+          sub(/^[ \t]*alias[ \t]+/, "", line)
+          split(line, parts, "=")
+          aname=parts[1]
+          gsub(/[ \t]+$/, "", aname)
+          if (aname == "e-"TARGET || aname == "c-"TARGET || aname == "cd-"TARGET) {
+            print FILENAME ":" NR ":" $0
+          }
+        }
+      ' "$dir"/* 2>/dev/null | sed 's|.*/||'
+    )"
+
+    if [[ -n "$variants" ]]; then
+      echo "  variants:"
+      echo "$variants" | sed 's/^/    - /'
+    fi
+
+    echo
+  done <<< "$matches"
+
+  if [[ "$count" -gt 1 ]]; then
+    echo "⚠️  conflict: $name has $count definitions (first match wins depending on load order)."
+  fi
+}
+# [/als-graph]

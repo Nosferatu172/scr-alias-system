@@ -1,0 +1,619 @@
+# =========================================================
+# Script Name: vpy
+# ID: SCR-ID-20260317103749-PCJS95E8PG
+# Assigned with: n/a
+# Created by: Tyler Jensen
+# Email: tylerjensen5@yahoo.com
+# Alias Call: vpy
+# vpy
+# Single-file shell-loaded Python venv controller
+#
+# Put this file in:
+#   /mnt/c/scr/aliases/lib/vpy
+#
+# Then source that folder from ~/.zshrc or ~/.bashrc
+#
+# This file defines:
+#   vpy
+#
+# Behavior:
+# - vpy on  -> activate nearest venv upward
+# - if none exists, create .venv in current directory and activate it
+# - activation/deactivation happen in the CURRENT shell
+# =========================================================
+
+if [[ -n "${VPY_LIB_LOADED:-}" ]]; then
+  return 0 2>/dev/null || exit 0
+fi
+VPY_LIB_LOADED=1
+
+VPY_DEFAULT_NAMES=".venv venv env"
+VPY_ACTIVE_PATH=""
+VPY_ACTIVE_PYTHON=""
+VPY_ACTIVE_PIP=""
+
+_vpy_echo() {
+  printf '%s\n' "$*"
+}
+
+_vpy_err() {
+  printf '❌ %s\n' "$*" >&2
+}
+
+_vpy_ok() {
+  printf '✅ %s\n' "$*"
+}
+
+_vpy_warn() {
+  printf '⚠️ %s\n' "$*"
+}
+
+_vpy_cmd_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+_vpy_realpath_fallback() {
+  if _vpy_cmd_exists realpath; then
+    realpath "$1" 2>/dev/null && return 0
+  fi
+
+  python3 - <<'PY' "$1" 2>/dev/null
+import os, sys
+print(os.path.realpath(sys.argv[1]))
+PY
+}
+
+_vpy_get_caller_pwd() {
+  if [[ -n "${SCR_CALLER_PWD:-}" && -d "${SCR_CALLER_PWD:-}" ]]; then
+    printf '%s\n' "$SCR_CALLER_PWD"
+  else
+    pwd
+  fi
+}
+
+_vpy_find_up() {
+  local start dir name
+  start="${1:-$(_vpy_get_caller_pwd)}"
+
+  [[ -d "$start" ]] || return 1
+  dir="$start"
+
+  while :; do
+    for name in $VPY_DEFAULT_NAMES; do
+      if [[ -d "$dir/$name" && -f "$dir/$name/bin/activate" ]]; then
+        printf '%s\n' "$dir/$name"
+        return 0
+      fi
+    done
+
+    [[ "$dir" == "/" ]] && break
+    dir="$(dirname "$dir")"
+  done
+
+  return 1
+}
+
+_vpy_find_here() {
+  local dir name
+  dir="${1:-$(_vpy_get_caller_pwd)}"
+
+  [[ -d "$dir" ]] || return 1
+
+  for name in $VPY_DEFAULT_NAMES; do
+    if [[ -d "$dir/$name" && -f "$dir/$name/bin/activate" ]]; then
+      printf '%s\n' "$dir/$name"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+_vpy_find_in_dir() {
+  local dir="$1"
+  local name
+
+  [[ -d "$dir" ]] || return 1
+
+  for name in $VPY_DEFAULT_NAMES; do
+    if [[ -d "$dir/$name" && -f "$dir/$name/bin/activate" ]]; then
+      printf '%s\n' "$dir/$name"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+_vpy_python_choice() {
+  local c
+  for c in python3.13 python3.12 python3.11 python3.10 python3; do
+    if _vpy_cmd_exists "$c"; then
+      printf '%s\n' "$c"
+      return 0
+    fi
+  done
+  return 1
+}
+
+_vpy_activate_path() {
+  local venv_dir activate_path
+  venv_dir="$1"
+
+  [[ -z "$venv_dir" ]] && { _vpy_err "No venv path provided."; return 1; }
+  [[ -d "$venv_dir" ]] || { _vpy_err "Venv directory not found: $venv_dir"; return 1; }
+
+  activate_path="$venv_dir/bin/activate"
+  [[ -f "$activate_path" ]] || { _vpy_err "activate file not found: $activate_path"; return 1; }
+
+  if [[ -n "${VIRTUAL_ENV:-}" ]] && type deactivate >/dev/null 2>&1; then
+    deactivate >/dev/null 2>&1
+  fi
+
+  # shellcheck disable=SC1090
+  source "$activate_path" || {
+    _vpy_err "Failed to source activate script: $activate_path"
+    return 1
+  }
+
+  VPY_ACTIVE_PATH="$venv_dir"
+  VPY_ACTIVE_PYTHON="$venv_dir/bin/python"
+  VPY_ACTIVE_PIP="$venv_dir/bin/pip"
+
+  _vpy_ok "Activated: $venv_dir"
+  return 0
+}
+
+_vpy_ensure_active() {
+  if [[ -n "${VIRTUAL_ENV:-}" && -x "${VIRTUAL_ENV}/bin/python" ]]; then
+    VPY_ACTIVE_PATH="${VIRTUAL_ENV}"
+    VPY_ACTIVE_PYTHON="${VIRTUAL_ENV}/bin/python"
+    VPY_ACTIVE_PIP="${VIRTUAL_ENV}/bin/pip"
+    return 0
+  fi
+
+  _vpy_err "No active venv."
+  _vpy_echo "Use one of:"
+  _vpy_echo "  vpy on"
+  _vpy_echo "  vpy on /path/to/.venv"
+  return 1
+}
+
+_vpy_show_status() {
+  local found py
+  _vpy_echo "========== vpy status =========="
+
+  if [[ -n "${VIRTUAL_ENV:-}" ]]; then
+    _vpy_echo "active venv : ${VIRTUAL_ENV}"
+  else
+    _vpy_echo "active venv : none"
+  fi
+
+  found="$(_vpy_find_up "$(_vpy_get_caller_pwd)")"
+  if [[ -n "$found" ]]; then
+    _vpy_echo "nearest venv: $found"
+  else
+    _vpy_echo "nearest venv: none found upward"
+  fi
+
+  if [[ -n "${VIRTUAL_ENV:-}" && -x "${VIRTUAL_ENV}/bin/python" ]]; then
+    _vpy_echo "python      : $("${VIRTUAL_ENV}/bin/python" --version 2>&1)"
+    _vpy_echo "pip         : $("${VIRTUAL_ENV}/bin/pip" --version 2>&1)"
+  else
+    py="$(_vpy_python_choice)"
+    if [[ -n "$py" ]]; then
+      _vpy_echo "system py   : $($py --version 2>&1)"
+    else
+      _vpy_echo "system py   : not found"
+    fi
+  fi
+}
+
+_vpy_make() {
+  local target_dir venv_name py venv_dir
+  target_dir="${1:-$(_vpy_get_caller_pwd)}"
+  venv_name="${2:-.venv}"
+
+  [[ -d "$target_dir" ]] || { _vpy_err "Target directory not found: $target_dir"; return 1; }
+
+  py="$(_vpy_python_choice)" || {
+    _vpy_err "No supported python3 interpreter found."
+    return 1
+  }
+
+  venv_dir="$target_dir/$venv_name"
+
+  if [[ -d "$venv_dir" && -f "$venv_dir/bin/activate" ]]; then
+    _vpy_warn "Venv already exists: $venv_dir"
+    _vpy_activate_path "$venv_dir"
+    return $?
+  fi
+
+  _vpy_echo "[make] using interpreter: $py"
+  "$py" -m venv "$venv_dir" || {
+    _vpy_err "Failed to create venv: $venv_dir"
+    return 1
+  }
+
+  [[ -f "$venv_dir/bin/activate" ]] || {
+    _vpy_err "Venv created but activate script missing: $venv_dir/bin/activate"
+    return 1
+  }
+
+  _vpy_ok "Created venv: $venv_dir"
+  _vpy_activate_path "$venv_dir" || return 1
+
+  if [[ -x "$venv_dir/bin/python" ]]; then
+    "$venv_dir/bin/python" -m pip install --upgrade pip setuptools wheel >/dev/null 2>&1
+  fi
+
+  return 0
+}
+
+_vpy_install_requirements() {
+  local req
+  _vpy_ensure_active || return 1
+
+  req="${1:-requirements.txt}"
+  [[ -f "$req" ]] || { _vpy_err "Requirements file not found: $req"; return 1; }
+
+  "$VPY_ACTIVE_PIP" install -r "$req"
+}
+
+_vpy_deactivate_if_target_active() {
+  local target real_target real_active
+  target="$1"
+
+  real_target="$(_vpy_realpath_fallback "$target")"
+  real_active=""
+
+  if [[ -n "${VIRTUAL_ENV:-}" ]]; then
+    real_active="$(_vpy_realpath_fallback "$VIRTUAL_ENV")"
+  fi
+
+  if [[ -n "$real_target" && -n "$real_active" && "$real_target" == "$real_active" ]]; then
+    if type deactivate >/dev/null 2>&1; then
+      deactivate >/dev/null 2>&1
+    fi
+    VPY_ACTIVE_PATH=""
+    VPY_ACTIVE_PYTHON=""
+    VPY_ACTIVE_PIP=""
+    _vpy_ok "Deactivated active venv before removal."
+  fi
+}
+
+_vpy_is_safe_remove_target() {
+  local target real_target
+  target="$1"
+
+  [[ -n "$target" ]] || return 1
+  [[ -d "$target" ]] || return 1
+  [[ -f "$target/bin/activate" ]] || return 1
+
+  real_target="$(_vpy_realpath_fallback "$target")"
+
+  [[ -n "$real_target" ]] || return 1
+  [[ "$real_target" != "/" ]] || return 1
+  [[ "$real_target" != "/root" ]] || return 1
+  [[ "$real_target" != "/home" ]] || return 1
+  [[ "$real_target" != "/usr" ]] || return 1
+  [[ "$real_target" != "/bin" ]] || return 1
+  [[ "$real_target" != "/etc" ]] || return 1
+  [[ "$real_target" != "/var" ]] || return 1
+  [[ "$real_target" != "/opt" ]] || return 1
+
+  case "${real_target##*/}" in
+    .venv|venv|env) return 0 ;;
+    *)
+      [[ -x "$target/bin/python" && -x "$target/bin/pip" ]]
+      return $?
+      ;;
+  esac
+}
+
+_vpy_remove() {
+  local arg1="$1"
+  local arg2="$2"
+  local target
+
+  if [[ -z "$arg1" ]]; then
+    target="$(_vpy_find_up "$(_vpy_get_caller_pwd)")" || {
+      _vpy_err "No upward venv found to remove."
+      return 1
+    }
+  elif [[ -n "$arg1" && -z "$arg2" ]]; then
+    if [[ -d "$arg1" && -f "$arg1/bin/activate" ]]; then
+      target="$arg1"
+    elif [[ -d "$arg1" ]]; then
+      target="$(_vpy_find_in_dir "$arg1")" || {
+        _vpy_err "No venv found inside project dir: $arg1"
+        return 1
+      }
+    else
+      _vpy_err "Not a valid venv path or project dir: $arg1"
+      return 1
+    fi
+  else
+    [[ -d "$arg1" ]] || { _vpy_err "Target directory not found: $arg1"; return 1; }
+    target="$arg1/$arg2"
+  fi
+
+  [[ -d "$target" ]] || { _vpy_err "Venv directory not found: $target"; return 1; }
+  [[ -f "$target/bin/activate" ]] || { _vpy_err "Not a valid venv directory: $target"; return 1; }
+
+  _vpy_is_safe_remove_target "$target" || {
+    _vpy_err "Refusing unsafe remove target: $target"
+    return 1
+  }
+
+  _vpy_deactivate_if_target_active "$target"
+
+  rm -rf -- "$target" || {
+    _vpy_err "Failed to remove: $target"
+    return 1
+  }
+
+  _vpy_ok "Removed venv: $target"
+  return 0
+}
+
+_vpy_turn_on() {
+  local arg1="$1"
+  local arg2="$2"
+  local found
+  local cwd
+
+  cwd="$(_vpy_get_caller_pwd)"
+
+  if [[ -z "$arg1" ]]; then
+    found="$(_vpy_find_up "$cwd")"
+
+    if [[ -n "$found" ]]; then
+      _vpy_activate_path "$found"
+      return $?
+    fi
+
+    _vpy_warn "No venv found. Creating .venv in: $cwd"
+    _vpy_make "$cwd" ".venv"
+    return $?
+  fi
+
+  if [[ -d "$arg1" && -f "$arg1/bin/activate" ]]; then
+    _vpy_activate_path "$arg1"
+    return $?
+  fi
+
+  if [[ -d "$arg1" && -z "$arg2" ]]; then
+    found="$(_vpy_find_in_dir "$arg1")"
+
+    if [[ -n "$found" ]]; then
+      _vpy_activate_path "$found"
+      return $?
+    fi
+
+    _vpy_warn "No venv found. Creating .venv in: $arg1"
+    _vpy_make "$arg1" ".venv"
+    return $?
+  fi
+
+  if [[ -d "$arg1" && -n "$arg2" ]]; then
+    found="$arg1/$arg2"
+
+    if [[ -f "$found/bin/activate" ]]; then
+      _vpy_activate_path "$found"
+      return $?
+    fi
+
+    _vpy_warn "Env not found. Creating: $found"
+    _vpy_make "$arg1" "$arg2"
+    return $?
+  fi
+
+  _vpy_err "Invalid target: $arg1"
+  return 1
+}
+
+_vpy_help() {
+  cat <<'EOF'
+vpy - single-file python venv controller
+
+Usage:
+  vpy
+  vpy help
+  vpy status
+  vpy find
+  vpy here
+
+  vpy on
+  vpy on /path/to/.venv
+  vpy on /path/to/project
+  vpy on /path/to/project myenv
+
+  vpy off
+
+  vpy mk
+  vpy mk /path/to/project
+  vpy mk /path/to/project myenv
+
+  vpy rm
+  vpy rm /path/to/.venv
+  vpy rm /path/to/project
+  vpy rm /path/to/project myenv
+
+  vpy py [args...]
+  vpy pip [args...]
+  vpy run script.py [args...]
+  vpy mod module.name [args...]
+  vpy req
+  vpy req requirements-dev.txt
+  vpy install <packages...>
+  vpy where
+
+Commands:
+  help        Show this help
+  status      Show active venv + nearest detected venv
+  find        Search upward from current directory for nearest venv
+  here        Check current directory only for .venv / venv / env
+
+  on          Activate nearest upward venv; create .venv if none exists
+  on PATH     Activate explicit venv path, or project-local .venv/venv/env
+  on DIR NAME Activate NAME venv in DIR, creating it if missing
+
+  off         Deactivate current venv
+
+  mk          Create .venv in current directory, then activate it
+  mk DIR      Create .venv in DIR, then activate it
+  mk DIR NAME Create NAME venv in DIR, then activate it
+
+  rm          Remove nearest upward venv
+  rm PATH     Remove explicit venv path, or project-local .venv/venv/env
+  rm DIR NAME Remove NAME venv in DIR
+
+  py          Run python inside active venv
+  pip         Run pip inside active venv
+  run         Run python script inside active venv
+  mod         Run python -m module inside active venv
+  req         pip install -r requirements.txt
+  install     pip install <packages...>
+  where       Print active venv path
+
+Aliases:
+  use, activate     -> on
+  deactivate        -> off
+  make, new, create -> mk
+  remove, reset     -> rm
+EOF
+}
+
+vpy_main() {
+  local cmd arg1 arg2 found here
+  cmd="${1:-help}"
+
+  case "$cmd" in
+    -h|--help|help)
+      _vpy_help
+      return 0
+      ;;
+
+    status|st)
+      _vpy_show_status
+      return 0
+      ;;
+
+    find)
+      found="$(_vpy_find_up "$(_vpy_get_caller_pwd)")"
+      if [[ -n "$found" ]]; then
+        printf '%s\n' "$found"
+        return 0
+      fi
+      _vpy_err "No upward venv found."
+      return 1
+      ;;
+
+    here)
+      here="$(_vpy_find_here "$(_vpy_get_caller_pwd)")"
+      if [[ -n "$here" ]]; then
+        printf '%s\n' "$here"
+        return 0
+      fi
+      _vpy_err "No venv found in current directory."
+      return 1
+      ;;
+
+    on|use|activate)
+      shift
+      _vpy_turn_on "${1:-}" "${2:-}"
+      return $?
+      ;;
+
+    mk|make|new|create)
+      shift
+      arg1="${1:-$(_vpy_get_caller_pwd)}"
+      arg2="${2:-.venv}"
+      _vpy_make "$arg1" "$arg2"
+      return $?
+      ;;
+
+    rm|remove|reset)
+      shift
+      _vpy_remove "${1:-}" "${2:-}"
+      return $?
+      ;;
+
+    off|deactivate)
+      if type deactivate >/dev/null 2>&1; then
+        deactivate
+        VPY_ACTIVE_PATH=""
+        VPY_ACTIVE_PYTHON=""
+        VPY_ACTIVE_PIP=""
+        _vpy_ok "Deactivated venv."
+        return 0
+      fi
+      _vpy_warn "No active venv to deactivate."
+      return 0
+      ;;
+
+    py|python)
+      shift
+      _vpy_ensure_active || return 1
+      "$VPY_ACTIVE_PYTHON" "$@"
+      return $?
+      ;;
+
+    pip)
+      shift
+      _vpy_ensure_active || return 1
+      "$VPY_ACTIVE_PIP" "$@"
+      return $?
+      ;;
+
+    run)
+      shift
+      [[ $# -gt 0 ]] || { _vpy_err "Usage: vpy run <script.py> [args...]"; return 1; }
+      _vpy_ensure_active || return 1
+      "$VPY_ACTIVE_PYTHON" "$@"
+      return $?
+      ;;
+
+    mod|module)
+      shift
+      [[ $# -gt 0 ]] || { _vpy_err "Usage: vpy mod <module.name> [args...]"; return 1; }
+      _vpy_ensure_active || return 1
+      "$VPY_ACTIVE_PYTHON" -m "$@"
+      return $?
+      ;;
+
+    req|requirements)
+      shift
+      _vpy_install_requirements "${1:-requirements.txt}"
+      return $?
+      ;;
+
+    install|add)
+      shift
+      [[ $# -gt 0 ]] || { _vpy_err "Usage: vpy install <packages...>"; return 1; }
+      _vpy_ensure_active || return 1
+      "$VPY_ACTIVE_PIP" install "$@"
+      return $?
+      ;;
+
+    where|path)
+      if [[ -n "${VIRTUAL_ENV:-}" ]]; then
+        printf '%s\n' "${VIRTUAL_ENV}"
+        return 0
+      fi
+      _vpy_err "No active venv."
+      return 1
+      ;;
+
+    *)
+      _vpy_warn "Unknown subcommand: $cmd"
+      _vpy_help
+      return 1
+      ;;
+  esac
+}
+
+vpy() {
+  vpy_main "$@"
+}

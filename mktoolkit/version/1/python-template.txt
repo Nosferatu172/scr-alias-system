@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+
+# ============================================
+# Script Name: __SCRIPT_NAME__
+# Description:
+# Author: shadowwalker
+# Created: __DATE__
+# Path: __FULL_PATH__
+# ============================================
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+
+# ------------------------------------------------
+# Script paths
+# ------------------------------------------------
+
+SCRIPT_PATH = Path(__file__).resolve()
+SCRIPT_DIR = SCRIPT_PATH.parent
+SCRIPT_NAME = SCRIPT_PATH.name
+
+
+# ------------------------------------------------
+# Colors
+# ------------------------------------------------
+
+CYAN = "\033[36m"
+GREEN = "\033[32m"
+RED = "\033[31m"
+YELLOW = "\033[33m"
+RESET = "\033[0m"
+
+
+# ------------------------------------------------
+# Logging helpers
+# ------------------------------------------------
+
+def info(msg: str) -> None:
+    print(f"{CYAN}[+] {msg}{RESET}")
+
+
+def success(msg: str) -> None:
+    print(f"{GREEN}[✔] {msg}{RESET}")
+
+
+def warn(msg: str) -> None:
+    print(f"{YELLOW}[!] {msg}{RESET}")
+
+
+def error(msg: str) -> None:
+    print(f"{RED}[✖] {msg}{RESET}")
+
+
+# ------------------------------------------------
+# Argument parser
+# ------------------------------------------------
+
+def build_parser() -> argparse.ArgumentParser:
+
+    parser = argparse.ArgumentParser(
+        description=SCRIPT_NAME
+    )
+
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Enable verbose output",
+    )
+
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug mode",
+    )
+
+    parser.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="Suppress normal output",
+    )
+
+    return parser
+
+
+# ------------------------------------------------
+# Main logic
+# ------------------------------------------------
+
+def main() -> int:
+
+    parser = build_parser()
+    args = parser.parse_args()
+
+    if args.verbose:
+        info(f"Running {SCRIPT_NAME}")
+        info(f"Script directory: {SCRIPT_DIR}")
+
+    if args.debug:
+        warn("Debug mode enabled")
+
+    if args.quiet:
+        pass
+
+    # ------------------------------------------------
+    # Your script logic here
+    # ------------------------------------------------
+
+    success("Finished successfully")
+
+    return 0
+
+
+# ------------------------------------------------
+# Entrypoint
+# ------------------------------------------------
+
+if __name__ == "__main__":
+    raise SystemExit(main())

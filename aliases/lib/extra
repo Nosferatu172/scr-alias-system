@@ -1,0 +1,36 @@
+list() {
+  cat << 'EOF'
+sptxt  - septxt.py
+setxt1 - setxt1.py
+setxt2 - settxt-1.5.py
+setxt3 - settxt-2.0.py
+setxt4 - settxt-2.1.py
+setxt5 - setxt-2.3.py
+septxt5 - septxt-1.2-split-urls.py
+EOF
+}
+
+add-t() {
+  cat << 'EOF'
+WINPROFILE = ENV["WINPROFILE"]
+
+destination_dir = "#{WINPROFILE}/Documents/tabs/"
+EOF
+}
+
+searchword() {
+    if [ -z "$1" ]; then
+        echo "Usage: searchword <word> [directory]"
+        return 1
+    fi
+
+    # Use second argument as directory, default to current folder
+    local dir="${2:-.}"
+
+    # Search for the word in all txt files, hide filenames, show line numbers
+    grep -hwin "$1" "$dir"/*.txt > output.txt
+
+    echo "Results saved to output.txt"
+}
+
+alias run_txt="for file in *.txt; do bash \"$file\"; done"

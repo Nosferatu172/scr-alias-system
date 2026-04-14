@@ -1,0 +1,654 @@
+# =========================================================
+# Script Name: vry
+# ID: SCR-ID-20260317103859-Q13P5G3FQD
+# Assigned with: n/a
+# Created by: Tyler Jensen
+# Email: tylerjensen5@yahoo.com
+# Alias Call: vry
+# vry
+# Single-file shell-loaded Ruby project environment controller
+#
+# Put this file in:
+#   /mnt/c/scr/aliases/lib/vry
+#
+# Then source that folder from ~/.zshrc or ~/.bashrc
+#
+# This file defines:
+#   vry
+#
+# Behavior:
+# - vry on  -> activate nearest ruby env upward
+# - if none exists, create .ruby-env in current directory and activate it
+# - activation/deactivation happen in the CURRENT shell
+# - isolates gems per project via GEM_HOME / GEM_PATH / PATH
+#
+# Note:
+# - this isolates gems, not the Ruby interpreter version
+# =========================================================
+
+if [[ -n "${VRY_LIB_LOADED:-}" ]]; then
+  return 0 2>/dev/null || exit 0
+fi
+VRY_LIB_LOADED=1
+
+VRY_DEFAULT_NAMES=".ruby-env ruby-env .gem-home"
+VRY_ACTIVE_PATH=""
+VRY_OLD_GEM_HOME=""
+VRY_OLD_GEM_PATH=""
+VRY_OLD_PATH=""
+VRY_OLD_BUNDLE_PATH=""
+VRY_OLD_BUNDLE_BIN=""
+VRY_OLD_BUNDLE_APP_CONFIG=""
+
+_vry_echo() {
+  printf '%s\n' "$*"
+}
+
+_vry_err() {
+  printf '❌ %s\n' "$*" >&2
+}
+
+_vry_ok() {
+  printf '✅ %s\n' "$*"
+}
+
+_vry_warn() {
+  printf '⚠️ %s\n' "$*"
+}
+
+_vry_cmd_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+_vry_realpath_fallback() {
+  if _vry_cmd_exists realpath; then
+    realpath "$1" 2>/dev/null && return 0
+  fi
+
+  python3 - <<'PY' "$1" 2>/dev/null
+import os, sys
+print(os.path.realpath(sys.argv[1]))
+PY
+}
+
+_vry_get_caller_pwd() {
+  if [[ -n "${SCR_CALLER_PWD:-}" && -d "${SCR_CALLER_PWD:-}" ]]; then
+    printf '%s\n' "$SCR_CALLER_PWD"
+  else
+    pwd
+  fi
+}
+
+_vry_ruby_choice() {
+  local c
+  for c in ruby ruby3.3 ruby3.2 ruby3.1 ruby3.0; do
+    if _vry_cmd_exists "$c"; then
+      printf '%s\n' "$c"
+      return 0
+    fi
+  done
+  return 1
+}
+
+_vry_gem_choice() {
+  local c
+  for c in gem; do
+    if _vry_cmd_exists "$c"; then
+      printf '%s\n' "$c"
+      return 0
+    fi
+  done
+  return 1
+}
+
+_vry_bundle_choice() {
+  local c
+  for c in bundle bundler; do
+    if _vry_cmd_exists "$c"; then
+      printf '%s\n' "$c"
+      return 0
+    fi
+  done
+  return 1
+}
+
+_vry_find_up() {
+  local start dir name
+  start="${1:-$(_vry_get_caller_pwd)}"
+
+  [[ -d "$start" ]] || return 1
+  dir="$start"
+
+  while :; do
+    for name in $VRY_DEFAULT_NAMES; do
+      if [[ -d "$dir/$name" && -d "$dir/$name/gems" && -d "$dir/$name/bin" ]]; then
+        printf '%s\n' "$dir/$name"
+        return 0
+      fi
+    done
+
+    [[ "$dir" == "/" ]] && break
+    dir="$(dirname "$dir")"
+  done
+
+  return 1
+}
+
+_vry_find_here() {
+  local dir name
+  dir="${1:-$(_vry_get_caller_pwd)}"
+
+  [[ -d "$dir" ]] || return 1
+
+  for name in $VRY_DEFAULT_NAMES; do
+    if [[ -d "$dir/$name" && -d "$dir/$name/gems" && -d "$dir/$name/bin" ]]; then
+      printf '%s\n' "$dir/$name"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+_vry_find_in_dir() {
+  local dir="$1"
+  local name
+
+  [[ -d "$dir" ]] || return 1
+
+  for name in $VRY_DEFAULT_NAMES; do
+    if [[ -d "$dir/$name" && -d "$dir/$name/gems" && -d "$dir/$name/bin" ]]; then
+      printf '%s\n' "$dir/$name"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+_vry_make() {
+  local target_dir env_name env_dir
+  target_dir="${1:-$(_vry_get_caller_pwd)}"
+  env_name="${2:-.ruby-env}"
+
+  [[ -d "$target_dir" ]] || { _vry_err "Target directory not found: $target_dir"; return 1; }
+
+  _vry_ruby_choice >/dev/null || {
+    _vry_err "Ruby is not installed or not in PATH."
+    return 1
+  }
+
+  _vry_gem_choice >/dev/null || {
+    _vry_err "gem command not found."
+    return 1
+  }
+
+  env_dir="$target_dir/$env_name"
+
+  if [[ -d "$env_dir" && -d "$env_dir/gems" && -d "$env_dir/bin" ]]; then
+    _vry_warn "Ruby env already exists: $env_dir"
+    _vry_activate_path "$env_dir"
+    return $?
+  fi
+
+  mkdir -p "$env_dir/gems" "$env_dir/bin" "$env_dir/.bundle" || {
+    _vry_err "Failed to create env directories: $env_dir"
+    return 1
+  }
+
+  _vry_ok "Created ruby env: $env_dir"
+  _vry_activate_path "$env_dir" || return 1
+
+  if _vry_gem_choice >/dev/null; then
+    gem install bundler --no-document >/dev/null 2>&1 || true
+  fi
+
+  return 0
+}
+
+_vry_activate_path() {
+  local env_dir
+  env_dir="$1"
+
+  [[ -z "$env_dir" ]] && { _vry_err "No env path provided."; return 1; }
+  [[ -d "$env_dir" ]] || { _vry_err "Env directory not found: $env_dir"; return 1; }
+
+  mkdir -p "$env_dir/gems" "$env_dir/bin" "$env_dir/.bundle" || {
+    _vry_err "Failed to prepare env directories: $env_dir"
+    return 1
+  }
+
+  if [[ -n "${VRY_ACTIVE_PATH:-}" ]]; then
+    _vry_deactivate_silent
+  fi
+
+  VRY_OLD_GEM_HOME="${GEM_HOME:-}"
+  VRY_OLD_GEM_PATH="${GEM_PATH:-}"
+  VRY_OLD_PATH="${PATH:-}"
+  VRY_OLD_BUNDLE_PATH="${BUNDLE_PATH:-}"
+  VRY_OLD_BUNDLE_BIN="${BUNDLE_BIN:-}"
+  VRY_OLD_BUNDLE_APP_CONFIG="${BUNDLE_APP_CONFIG:-}"
+
+  export GEM_HOME="$env_dir/gems"
+  export GEM_PATH="$env_dir/gems"
+  export BUNDLE_PATH="$env_dir/gems"
+  export BUNDLE_BIN="$env_dir/bin"
+  export BUNDLE_APP_CONFIG="$env_dir/.bundle"
+  export PATH="$env_dir/bin:$env_dir/gems/bin:$PATH"
+
+  VRY_ACTIVE_PATH="$env_dir"
+  export VRY_ACTIVE_PATH
+
+  _vry_ok "Activated: $env_dir"
+  return 0
+}
+
+_vry_deactivate_silent() {
+  if [[ -n "${VRY_OLD_GEM_HOME+x}" ]]; then export GEM_HOME="$VRY_OLD_GEM_HOME"; else unset GEM_HOME; fi
+  if [[ -n "${VRY_OLD_GEM_PATH+x}" ]]; then export GEM_PATH="$VRY_OLD_GEM_PATH"; else unset GEM_PATH; fi
+  if [[ -n "${VRY_OLD_BUNDLE_PATH+x}" ]]; then export BUNDLE_PATH="$VRY_OLD_BUNDLE_PATH"; else unset BUNDLE_PATH; fi
+  if [[ -n "${VRY_OLD_BUNDLE_BIN+x}" ]]; then export BUNDLE_BIN="$VRY_OLD_BUNDLE_BIN"; else unset BUNDLE_BIN; fi
+  if [[ -n "${VRY_OLD_BUNDLE_APP_CONFIG+x}" ]]; then export BUNDLE_APP_CONFIG="$VRY_OLD_BUNDLE_APP_CONFIG"; else unset BUNDLE_APP_CONFIG; fi
+
+  if [[ -n "${VRY_OLD_PATH:-}" ]]; then
+    export PATH="$VRY_OLD_PATH"
+  fi
+
+  VRY_ACTIVE_PATH=""
+  unset VRY_ACTIVE_PATH
+}
+
+_vry_off() {
+  if [[ -z "${VRY_ACTIVE_PATH:-}" ]]; then
+    _vry_warn "No active ruby env to deactivate."
+    return 0
+  fi
+
+  _vry_deactivate_silent
+  _vry_ok "Deactivated ruby env."
+  return 0
+}
+
+_vry_ensure_active() {
+  if [[ -n "${VRY_ACTIVE_PATH:-}" && -d "${VRY_ACTIVE_PATH}" ]]; then
+    return 0
+  fi
+
+  _vry_err "No active ruby env."
+  _vry_echo "Use:"
+  _vry_echo "  vry on"
+  _vry_echo "  vry on /path/to/.ruby-env"
+  return 1
+}
+
+_vry_show_status() {
+  local found rb gm bd
+  _vry_echo "========== vry status =========="
+
+  if [[ -n "${VRY_ACTIVE_PATH:-}" ]]; then
+    _vry_echo "active env  : ${VRY_ACTIVE_PATH}"
+    _vry_echo "GEM_HOME    : ${GEM_HOME:-unset}"
+    _vry_echo "BUNDLE_PATH : ${BUNDLE_PATH:-unset}"
+  else
+    _vry_echo "active env  : none"
+  fi
+
+  found="$(_vry_find_up "$(_vry_get_caller_pwd)")"
+  if [[ -n "$found" ]]; then
+    _vry_echo "nearest env : $found"
+  else
+    _vry_echo "nearest env : none found upward"
+  fi
+
+  rb="$(_vry_ruby_choice)"
+  gm="$(_vry_gem_choice)"
+  bd="$(_vry_bundle_choice)"
+
+  if [[ -n "$rb" ]]; then
+    _vry_echo "ruby        : $($rb --version 2>&1)"
+  else
+    _vry_echo "ruby        : not found"
+  fi
+
+  if [[ -n "$gm" ]]; then
+    _vry_echo "gem         : $($gm --version 2>&1)"
+  else
+    _vry_echo "gem         : not found"
+  fi
+
+  if [[ -n "$bd" ]]; then
+    _vry_echo "bundler     : $($bd --version 2>&1)"
+  else
+    _vry_echo "bundler     : not found"
+  fi
+}
+
+_vry_install_gems() {
+  _vry_ensure_active || return 1
+  [[ $# -gt 0 ]] || { _vry_err "Usage: vry gem install <gems...>"; return 1; }
+  gem install --no-document "$@"
+}
+
+_vry_bundle_install() {
+  _vry_ensure_active || return 1
+  if ! _vry_cmd_exists bundle; then
+    gem install bundler --no-document || return 1
+  fi
+  bundle install
+}
+
+_vry_is_safe_remove_target() {
+  local target real_target
+  target="$1"
+
+  [[ -n "$target" ]] || return 1
+  [[ -d "$target" ]] || return 1
+  [[ -d "$target/gems" ]] || return 1
+  [[ -d "$target/bin" ]] || return 1
+
+  real_target="$(_vry_realpath_fallback "$target")"
+
+  [[ -n "$real_target" ]] || return 1
+  [[ "$real_target" != "/" ]] || return 1
+  [[ "$real_target" != "/root" ]] || return 1
+  [[ "$real_target" != "/home" ]] || return 1
+  [[ "$real_target" != "/usr" ]] || return 1
+  [[ "$real_target" != "/bin" ]] || return 1
+  [[ "$real_target" != "/etc" ]] || return 1
+  [[ "$real_target" != "/var" ]] || return 1
+  [[ "$real_target" != "/opt" ]] || return 1
+
+  case "${real_target##*/}" in
+    .ruby-env|ruby-env|.gem-home) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+_vry_remove() {
+  local arg1="$1"
+  local arg2="$2"
+  local target
+
+  if [[ -z "$arg1" ]]; then
+    target="$(_vry_find_up "$(_vry_get_caller_pwd)")" || {
+      _vry_err "No upward ruby env found to remove."
+      return 1
+    }
+  elif [[ -n "$arg1" && -z "$arg2" ]]; then
+    if [[ -d "$arg1" && -d "$arg1/gems" && -d "$arg1/bin" ]]; then
+      target="$arg1"
+    elif [[ -d "$arg1" ]]; then
+      target="$(_vry_find_in_dir "$arg1")" || {
+        _vry_err "No ruby env found inside project dir: $arg1"
+        return 1
+      }
+    else
+      _vry_err "Not a valid env path or project dir: $arg1"
+      return 1
+    fi
+  else
+    [[ -d "$arg1" ]] || { _vry_err "Target directory not found: $arg1"; return 1; }
+    target="$arg1/$arg2"
+  fi
+
+  _vry_is_safe_remove_target "$target" || {
+    _vry_err "Refusing unsafe remove target: $target"
+    return 1
+  }
+
+  if [[ -n "${VRY_ACTIVE_PATH:-}" ]]; then
+    local real_target real_active
+    real_target="$(_vry_realpath_fallback "$target")"
+    real_active="$(_vry_realpath_fallback "$VRY_ACTIVE_PATH")"
+    if [[ -n "$real_target" && -n "$real_active" && "$real_target" == "$real_active" ]]; then
+      _vry_deactivate_silent
+      _vry_ok "Deactivated active ruby env before removal."
+    fi
+  fi
+
+  rm -rf -- "$target" || {
+    _vry_err "Failed to remove: $target"
+    return 1
+  }
+
+  _vry_ok "Removed ruby env: $target"
+  return 0
+}
+
+_vry_turn_on() {
+  local arg1="$1"
+  local arg2="$2"
+  local found
+  local cwd
+
+  cwd="$(_vry_get_caller_pwd)"
+
+  if [[ -z "$arg1" ]]; then
+    found="$(_vry_find_up "$cwd")"
+
+    if [[ -n "$found" ]]; then
+      _vry_activate_path "$found"
+      return $?
+    fi
+
+    _vry_warn "No ruby env found. Creating .ruby-env in: $cwd"
+    _vry_make "$cwd" ".ruby-env"
+    return $?
+  fi
+
+  if [[ -d "$arg1" && -d "$arg1/gems" && -d "$arg1/bin" ]]; then
+    _vry_activate_path "$arg1"
+    return $?
+  fi
+
+  if [[ -d "$arg1" && -z "$arg2" ]]; then
+    found="$(_vry_find_in_dir "$arg1")"
+
+    if [[ -n "$found" ]]; then
+      _vry_activate_path "$found"
+      return $?
+    fi
+
+    _vry_warn "No ruby env found. Creating .ruby-env in: $arg1"
+    _vry_make "$arg1" ".ruby-env"
+    return $?
+  fi
+
+  if [[ -d "$arg1" && -n "$arg2" ]]; then
+    found="$arg1/$arg2"
+
+    if [[ -d "$found/gems" && -d "$found/bin" ]]; then
+      _vry_activate_path "$found"
+      return $?
+    fi
+
+    _vry_warn "Env not found. Creating: $found"
+    _vry_make "$arg1" "$arg2"
+    return $?
+  fi
+
+  _vry_err "Invalid target: $arg1"
+  return 1
+}
+
+_vry_help() {
+  cat <<'EOF'
+vry - single-file ruby project environment controller
+
+Usage:
+  vry
+  vry help
+  vry status
+  vry find
+  vry here
+
+  vry on
+  vry on /path/to/.ruby-env
+  vry on /path/to/project
+  vry on /path/to/project myenv
+
+  vry off
+
+  vry mk
+  vry mk /path/to/project
+  vry mk /path/to/project myenv
+
+  vry rm
+  vry rm /path/to/.ruby-env
+  vry rm /path/to/project
+  vry rm /path/to/project myenv
+
+  vry ruby [args...]
+  vry irb
+  vry gem install <gems...>
+  vry bundle install
+  vry bundle exec <cmd...>
+  vry run script.rb [args...]
+  vry where
+
+Commands:
+  on          Activate nearest upward env; create .ruby-env if none exists
+  off         Deactivate current env
+  mk          Create env and activate it
+  rm          Remove env
+  status      Show active env and ruby info
+  find        Search upward for nearest env
+  here        Check current directory only
+  ruby        Run ruby inside active env
+  irb         Start irb inside active env
+  gem         Run gem inside active env
+  bundle      Run bundle inside active env
+  run         Run ruby script inside active env
+  where       Print active env path
+
+Notes:
+  - This isolates gems per project.
+  - This does NOT switch Ruby interpreter versions.
+EOF
+}
+
+vry_main() {
+  local cmd found here
+  cmd="${1:-help}"
+
+  case "$cmd" in
+    -h|--help|help)
+      _vry_help
+      return 0
+      ;;
+
+    status|st)
+      _vry_show_status
+      return 0
+      ;;
+
+    find)
+      found="$(_vry_find_up "$(_vry_get_caller_pwd)")"
+      if [[ -n "$found" ]]; then
+        printf '%s\n' "$found"
+        return 0
+      fi
+      _vry_err "No upward ruby env found."
+      return 1
+      ;;
+
+    here)
+      here="$(_vry_find_here "$(_vry_get_caller_pwd)")"
+      if [[ -n "$here" ]]; then
+        printf '%s\n' "$here"
+        return 0
+      fi
+      _vry_err "No ruby env found in current directory."
+      return 1
+      ;;
+
+    on|use|activate)
+      shift
+      _vry_turn_on "${1:-}" "${2:-}"
+      return $?
+      ;;
+
+    mk|make|new|create)
+      shift
+      _vry_make "${1:-$(_vry_get_caller_pwd)}" "${2:-.ruby-env}"
+      return $?
+      ;;
+
+    rm|remove|reset)
+      shift
+      _vry_remove "${1:-}" "${2:-}"
+      return $?
+      ;;
+
+    off|deactivate)
+      _vry_off
+      return $?
+      ;;
+
+    ruby)
+      shift
+      _vry_ensure_active || return 1
+      ruby "$@"
+      return $?
+      ;;
+
+    irb)
+      shift
+      _vry_ensure_active || return 1
+      irb "$@"
+      return $?
+      ;;
+
+    gem)
+      shift
+      _vry_ensure_active || return 1
+      [[ $# -gt 0 ]] || { _vry_err "Usage: vry gem <args...>"; return 1; }
+      gem "$@"
+      return $?
+      ;;
+
+    bundle)
+      shift
+      _vry_ensure_active || return 1
+      if ! _vry_cmd_exists bundle; then
+        gem install bundler --no-document || return 1
+      fi
+      [[ $# -gt 0 ]] || { bundle install; return $?; }
+      bundle "$@"
+      return $?
+      ;;
+
+    run)
+      shift
+      _vry_ensure_active || return 1
+      [[ $# -gt 0 ]] || { _vry_err "Usage: vry run <script.rb> [args...]"; return 1; }
+      ruby "$@"
+      return $?
+      ;;
+
+    install|add)
+      shift
+      _vry_install_gems "$@"
+      return $?
+      ;;
+
+    where|path)
+      if [[ -n "${VRY_ACTIVE_PATH:-}" ]]; then
+        printf '%s\n' "${VRY_ACTIVE_PATH}"
+        return 0
+      fi
+      _vry_err "No active ruby env."
+      return 1
+      ;;
+
+    *)
+      _vry_warn "Unknown subcommand: $cmd"
+      _vry_help
+      return 1
+      ;;
+  esac
+}
+
+vry() {
+  vry_main "$@"
+}

@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+
+# ============================================
+# Script Name: __SCRIPT_NAME__
+# Description:
+# Author: shadowwalker
+# Created: __DATE__
+# Path: __FULL_PATH__
+# ============================================
+
+set -euo pipefail
+
+
+# ------------------------------------------------
+# Script paths
+# ------------------------------------------------
+
+SCRIPT_PATH="$(realpath "$0")"
+SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+SCRIPT_NAME="$(basename "$SCRIPT_PATH")"
+
+
+# ------------------------------------------------
+# Colors
+# ------------------------------------------------
+
+CYAN="\e[36m"
+GREEN="\e[32m"
+RED="\e[31m"
+YELLOW="\e[33m"
+RESET="\e[0m"
+
+
+# ------------------------------------------------
+# Logging helpers
+# ------------------------------------------------
+
+info() {
+    printf "%b[+] %s%b\n" "$CYAN" "$1" "$RESET"
+}
+
+success() {
+    printf "%b[✔] %s%b\n" "$GREEN" "$1" "$RESET"
+}
+
+warn() {
+    printf "%b[!] %s%b\n" "$YELLOW" "$1" "$RESET"
+}
+
+error() {
+    printf "%b[✖] %s%b\n" "$RED" "$1" "$RESET"
+}
+
+
+# ------------------------------------------------
+# Usage
+# ------------------------------------------------
+
+usage() {
+cat << EOF
+Usage:
+  $SCRIPT_NAME [options]
+
+Options:
+  -v, --verbose      Enable verbose output
+  -d, --debug        Enable debug mode
+  -h, --help         Show this help
+EOF
+}
+
+
+# ------------------------------------------------
+# Argument parsing
+# ------------------------------------------------
+
+VERBOSE=0
+DEBUG=0
+
+
+parse_args() {
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -v|--verbose)
+                VERBOSE=1
+                ;;
+            -d|--debug)
+                DEBUG=1
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            *)
+                error "Unknown argument: $1"
+                usage
+                exit 1
+                ;;
+        esac
+        shift
+    done
+
+}
+
+
+# ------------------------------------------------
+# Main logic
+# ------------------------------------------------
+
+main() {
+
+    parse_args "$@"
+
+    if [[ "$VERBOSE" -eq 1 ]]; then
+        info "Running $SCRIPT_NAME"
+        info "Script directory: $SCRIPT_DIR"
+    fi
+
+    if [[ "$DEBUG" -eq 1 ]]; then
+        warn "Debug mode enabled"
+    fi
+
+
+    # ------------------------------------------------
+    # Your script logic here
+    # ------------------------------------------------
+
+
+    success "Finished successfully"
+
+}
+
+
+main "$@"

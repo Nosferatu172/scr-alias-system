@@ -1,0 +1,5 @@
+{
+  "core": ["scrid", "scrwork"],
+  "media": ["yt-download"],
+  "system": ["net-diagnoze", "clnhash"]
+}

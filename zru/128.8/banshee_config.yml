@@ -1,0 +1,14 @@
+---
+ui:
+  show_hidden: true
+  page_size: 30
+archive:
+  days_old: 30
+  format: zip
+media:
+  ffmpeg: ffmpeg
+  default_audio: mp3
+  default_video: mp4
+directories:
+  cookies_dir: "/mnt/c/scr/keys/cookies/"
+  passwords_file: "/mnt/c/scr/keys/passwords.txt"

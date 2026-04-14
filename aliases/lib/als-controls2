@@ -1,0 +1,157 @@
+# =========================================================================================
+# [ Custom Commands Available ]
+# =========================================================================================
+# Created By: Tyler Jensen
+# Email: tylerjensen5@yahoo.com
+# Date: 01/31/2026
+# Version: 01/22/0001
+# =======================================================================================
+# To View Commands Type In "als."
+# =======================================================================================
+# Commands to find this Page:
+# [als]
+alias alsindexing="less /mnt/c/scr/aliases/lib/als-controls2"
+alias e-alsindexing="nano /mnt/c/scr/aliases/lib/als-controls2"
+# [/als]
+# ---------------------------------------------------------------------------------------
+# Commands:
+
+# =======================================================================================
+# [section-finders-show]
+# =======================================================================================
+
+# Show the als blocks from every alias file
+alss() {
+  local dir="/mnt/c/scr/aliases/lib"
+  for f in "$dir"/*; do
+    [[ -f "$f" ]] || continue
+    echo "===== $(basename "$f") ====="
+    awk '
+      /^# \[als\]/  {flag=1; next}
+      /^# \[\/als\]/ {flag=0}
+      flag && /^alias / {print}
+    ' "$f"
+    echo
+  done
+}
+
+# Show a specific tagged section across files.
+# Prints aliases AND public function headers inside that section.
+# (Public function = does not start with "_")
+als.section() {
+  local sec="$1"
+  local dir="/mnt/c/scr/aliases/lib"
+
+  [[ -z "$sec" ]] && { echo "Usage: als.section <section>"; return 1; }
+
+  for f in "$dir"/*; do
+    [[ -f "$f" ]] || continue
+
+    awk -v SEC="$sec" '
+      $0 ~ "^# \\[" SEC "\\]$"    {flag=1; next}
+      $0 ~ "^# \\[/" SEC "\\]$"   {flag=0}
+
+      # while inside the section:
+      flag && /^alias / {print; next}
+
+      # public functions like: name() {
+      flag && /^[ \t]*[A-Za-z0-9][A-Za-z0-9_-]*[ \t]*\(\)[ \t]*\{/ {
+        line=$0
+        sub(/^[ \t]*/, "", line)
+        # keep only "name() {" on one line for readability
+        sub(/\{.*/, "{", line)
+        print line
+        next
+      }
+    ' "$f" | awk 'NF{print}' | {
+      read -r first_line || continue
+      echo "===== $(basename "$f") ====="
+      echo "$first_line"
+      cat
+      echo
+    }
+  done
+}
+# [/section-finders-show]
+
+# =======================================================================================
+# [section-mapper]
+# =======================================================================================
+
+# List available items across all alias files.
+# Modes:
+#   als.sections tags     -> only "# [tag]" section labels
+#   als.sections funcs    -> only public function names (name() {), excluding "_private"
+#   als.sections aliases  -> only alias names
+#   als.sections all      -> everything (default)
+als.sections() {
+  local dir="/mnt/c/scr/aliases/lib"
+  local mode="${1:-all}"   # tags | funcs | aliases | all
+
+  # Detect terminal width safely
+  local width="${COLUMNS:-$(tput cols 2>/dev/null || echo 120)}"
+
+  awk -v MODE="$mode" '
+    function emit(x) { if (x != "") print x }
+
+    # -------------------------
+    # TAG SECTIONS: "# [name]"
+    # -------------------------
+    MODE ~ /^(all|tags)$/ && /^# \[[A-Za-z0-9_-]+\]$/ {
+      s=$0
+      sub(/^# \[/, "", s)
+      sub(/\]$/, "", s)
+      emit(s)
+      next
+    }
+
+    # -------------------------
+    # FUNCTIONS: "name() {"
+    # - public only (does not start with "_")
+    # -------------------------
+    MODE ~ /^(all|funcs)$/ && /^[ \t]*[A-Za-z0-9][A-Za-z0-9_-]*[ \t]*\(\)[ \t]*\{/ {
+      s=$0
+      sub(/^[ \t]*/, "", s)
+      sub(/[ \t]*\(\)[ \t]*\{.*/, "", s)
+      # exclude private helpers
+      if (s ~ /^_/) next
+      emit(s)
+      next
+    }
+
+    # -------------------------
+    # ALIASES: "alias name="
+    # -------------------------
+    MODE ~ /^(all|aliases)$/ && /^[ \t]*alias[ \t]+[A-Za-z0-9_.-]+=/ {
+      s=$0
+      sub(/^[ \t]*alias[ \t]+/, "", s)
+      sub(/=.*/, "", s)
+      emit(s)
+      next
+    }
+  ' "$dir"/* 2>/dev/null \
+  | sort -u \
+  | column -x -c "$width"
+}
+# [/section-mapper]
+# ---------------------------------------------------------------------------------------
+# [section-mapper-0]
+als.sections0() {
+  local dir="/mnt/c/scr/aliases/lib"
+
+  # Detect terminal width safely
+  local width="${COLUMNS:-$(tput cols 2>/dev/null || echo 120)}"
+
+  awk '
+    # EXACT tag line: "# [name]"
+    /^# \[[A-Za-z0-9_-]+\]$/ {
+      s=$0
+      sub(/^# \[/, "", s)
+      sub(/\]$/, "", s)
+      print s
+    }
+  ' "$dir"/* 2>/dev/null \
+  | sort -u \
+  | column -x -c "$width"
+}
+# [/section-mapper-0]

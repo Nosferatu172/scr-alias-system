@@ -1,0 +1,122 @@
+shedit() {
+
+  # ---------------------------------------------------------
+  # HELP
+  # ---------------------------------------------------------
+  shedit_help() {
+    cat <<'EOF'
+
+shedit - shell script walker (sh + zsh only)
+
+PURPOSE:
+  Sequentially open shell scripts in nano for review/editing
+
+USAGE:
+  shedit -a          Walk current directory
+  shedit <dir>       Walk specific directory
+  shedit -p          Pause between files
+  shedit -h          Help
+
+FLAGS:
+  -a     Active directory (current folder tree)
+  -p     Pause between files (Enter to continue)
+  -h     Show help
+
+SUPPORTED FILES:
+  .sh
+  .zsh
+
+BEHAVIOR:
+  - Opens each file in nano one by one
+  - Exit nano → automatically opens next file
+  - Ctrl+C aborts entire session
+
+EXAMPLES:
+  shedit -a
+  shedit -a -p
+  shedit /d/scr-pac
+EOF
+  }
+
+  # ---------------------------------------------------------
+  # DEFAULTS
+  # ---------------------------------------------------------
+  local root=""
+  local pause=0
+
+  # ---------------------------------------------------------
+  # ARG PARSING
+  # ---------------------------------------------------------
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -a)
+        root="."
+        shift
+        ;;
+      -p)
+        pause=1
+        shift
+        ;;
+      -h|--help)
+        shedit_help
+        return 0
+        ;;
+      *)
+        if [[ -z "$root" ]]; then
+          root="$1"
+        fi
+        shift
+        ;;
+    esac
+  done
+
+  [[ -z "$root" ]] && root="."
+  [[ -d "$root" ]] || {
+    echo "Directory not found: $root"
+    return 1
+  }
+
+  # ---------------------------------------------------------
+  # FIND SHELL FILES ONLY
+  # ---------------------------------------------------------
+  local files=()
+
+  while IFS= read -r f; do
+    files+=("$f")
+  done < <(
+    find "$root" -type f \( \
+      -iname "*.sh" -o -iname "*.zsh" \
+    \) 2>/dev/null | sort
+  )
+
+  if [[ ${#files[@]} -eq 0 ]]; then
+    echo "No shell scripts found in: $root"
+    return 1
+  fi
+
+  echo "Scanning: $root"
+  echo "Found ${#files[@]} shell scripts"
+  echo
+
+  # ---------------------------------------------------------
+  # CLEAN ABORT HANDLER
+  # ---------------------------------------------------------
+  trap "echo; echo 'shedit aborted.'; return 1" INT
+
+  # ---------------------------------------------------------
+  # WALK MODE (DEFAULT BEHAVIOR)
+  # ---------------------------------------------------------
+  local f
+
+  for f in "${files[@]}"; do
+    echo "Opening: $f"
+    nano "$f"
+
+    if [[ $pause -eq 1 ]]; then
+      echo
+      read -r -p "Press Enter for next file (Ctrl+C to stop)..." _
+    fi
+  done
+
+  echo "Done reviewing shell scripts."
+}

@@ -1,0 +1,513 @@
+[[ -n "$ZSH_VERSION" ]] || return 0
+
+# =========================================================================================
+# [ Custom Commands Available ]
+# =========================================================================================
+# Script Name: cdc4
+# ID: SCR-ID-20260317103406-RTS77AS1D5
+# Assigned with: n/a
+# Created by: Tyler Jensen
+# Email: tylerjensen5@yahoo.com 
+# Alias Call: c-alscdc
+# Updated: interactive runner support + input buffer flush
+# =========================================================================================
+# Controls
+#   ↑ ↓        move
+#   →          enter directory / open file menu
+#   ←          go up
+#   Enter      select directory and exit / open file menu for file
+#   .          toggle hidden files
+#   q          quit
+#
+# File Menu
+#   r          run with custom args
+#   h          run with -h
+#   x          chmod +x then run
+#   i          file info
+#   c          cat
+#   n          nano
+#   v          vim
+#   l          less
+#   q          cancel
+# =========================================================================================
+# Call this Page with this: c-alscdc
+
+unalias cdc 2>/dev/null || true
+unset -f cdc 2>/dev/null || true
+
+cdc() {
+  emulate -L zsh
+  setopt localoptions nullglob extendedglob no_aliases
+
+  # Flush any buffered keystrokes so arrow keys work immediately
+  while read -t 0; do
+    read -rs -k1
+  done
+
+  local show_hidden=0
+  local selected=1
+  local key k2 k3
+  local choice action
+  local -a labels raw_entries
+  local total=0
+
+  # -------------------------------------------------------
+  # Helpers
+  # -------------------------------------------------------
+  _cdc_hr_size() {
+    local bytes="${1:-0}"
+    local units=(B K M G T P)
+    local idx=1
+
+    while (( bytes >= 1024 && idx < ${#units[@]} )); do
+      bytes=$(( bytes / 1024 ))
+      (( idx++ ))
+    done
+
+    printf "%s%s" "$bytes" "$units[idx]"
+  }
+
+  _cdc_is_wsl() {
+    [[ -n "${WSL_DISTRO_NAME:-}" || -n "${WSL_INTEROP:-}" || -f /proc/sys/fs/binfmt_misc/WSLInterop ]]
+  }
+
+  _cdc_pause() {
+    echo
+    echo "Press any key to return..."
+    read -rs -k1
+  }
+
+  _cdc_abs_path() {
+    local file="$1"
+
+    if command -v realpath >/dev/null 2>&1; then
+      realpath -- "$file" 2>/dev/null && return 0
+    fi
+
+    python3 - "$file" 2>/dev/null <<'PY'
+import os, sys
+print(os.path.realpath(sys.argv[1]))
+PY
+  }
+
+  _cdc_detect_runner() {
+    local file="$1"
+    local base ext first_line
+
+    [[ -f "$file" ]] || return 1
+
+    base="${file:t}"
+    ext="${base:e:l}"
+
+    case "$ext" in
+      py)   print -r -- "python"; return 0 ;;
+      rb)   print -r -- "ruby"; return 0 ;;
+      sh)   print -r -- "bash"; return 0 ;;
+      bash) print -r -- "bash"; return 0 ;;
+      zsh)  print -r -- "zsh"; return 0 ;;
+      cmd)  print -r -- "cmd"; return 0 ;;
+      bat)  print -r -- "cmd"; return 0 ;;
+      ps1)  print -r -- "powershell"; return 0 ;;
+    esac
+
+    if [[ -x "$file" ]]; then
+      print -r -- "exec"
+      return 0
+    fi
+
+    first_line="$(head -n 1 -- "$file" 2>/dev/null)"
+
+    case "$first_line" in
+      '#!'*python*) print -r -- "python"; return 0 ;;
+      '#!'*ruby*)   print -r -- "ruby"; return 0 ;;
+      '#!'*bash*)   print -r -- "bash"; return 0 ;;
+      '#!'*zsh*)    print -r -- "zsh"; return 0 ;;
+      '#!'*sh)      print -r -- "bash"; return 0 ;;
+      '#!'*)
+        print -r -- "shebang"
+        return 0
+        ;;
+    esac
+
+    print -r -- "plain-file"
+    return 0
+  }
+
+  _cdc_prompt_run_args() {
+    local line
+    local -a out_args
+
+    echo
+    printf '> '
+    IFS= read -r line
+
+    if [[ -n "$line" ]]; then
+      out_args=("${(z)line}")
+    else
+      out_args=()
+    fi
+
+    REPLY=("${out_args[@]}")
+  }
+
+  _cdc_file_info() {
+    local file="$1"
+    local abs runner size perm
+    local first_line=""
+
+    abs="$(_cdc_abs_path "$file")"
+    runner="$(_cdc_detect_runner "$file" 2>/dev/null)"
+    size="$(_cdc_hr_size "$(wc -c < "$file" 2>/dev/null || echo 0)")"
+
+    if command -v stat >/dev/null 2>&1; then
+      perm="$(stat -c '%A' -- "$file" 2>/dev/null)"
+    else
+      perm="unknown"
+    fi
+
+    first_line="$(head -n 1 -- "$file" 2>/dev/null)"
+
+    clear
+    echo
+    echo "📄 File info"
+    echo "Path      : ${abs:-$file}"
+    echo "Name      : ${file:t}"
+    echo "Size      : $size"
+    echo "Perms     : $perm"
+    echo "Runner    : ${runner:-unknown}"
+    echo "Executable: $([[ -x "$file" ]] && echo yes || echo no)"
+    echo "Symlink   : $([[ -L "$file" ]] && echo yes || echo no)"
+    echo
+    echo "First line:"
+    echo "  ${first_line:-<empty>}"
+    _cdc_pause
+  }
+
+  _cdc_run_file() {
+    local file="$1"
+    shift
+    local runner winfile abs rc
+
+    [[ -f "$file" ]] || {
+      echo "❌ Not a file: $file"
+      _cdc_pause
+      return 1
+    }
+
+    runner="$(_cdc_detect_runner "$file")"
+    abs="$(_cdc_abs_path "$file")"
+    [[ -z "$abs" ]] && abs="$PWD/$file"
+
+    clear
+    echo
+    echo "[run:$runner] $file $*"
+    echo
+
+    case "$runner" in
+      python)
+        python3 -- "$file" "$@"
+        rc=$?
+        ;;
+      ruby)
+        ruby -- "$file" "$@"
+        rc=$?
+        ;;
+      bash)
+        bash -- "$file" "$@"
+        rc=$?
+        ;;
+      zsh)
+        zsh -- "$file" "$@"
+        rc=$?
+        ;;
+      exec)
+        "$file" "$@"
+        rc=$?
+        ;;
+      shebang)
+        chmod +x -- "$file" 2>/dev/null
+        "$file" "$@"
+        rc=$?
+        ;;
+      cmd)
+        if _cdc_is_wsl && command -v wslpath >/dev/null 2>&1 && command -v cmd.exe >/dev/null 2>&1; then
+          winfile="$(wslpath -w "$abs" 2>/dev/null)"
+          if [[ -n "$winfile" ]]; then
+            cmd.exe /c "\"$winfile\" $*"
+            rc=$?
+          else
+            echo "❌ Failed converting to Windows path."
+            rc=1
+          fi
+        else
+          echo "❌ .cmd/.bat support requires WSL with cmd.exe and wslpath."
+          rc=1
+        fi
+        ;;
+      powershell)
+        if _cdc_is_wsl && command -v wslpath >/dev/null 2>&1 && command -v powershell.exe >/dev/null 2>&1; then
+          winfile="$(wslpath -w "$abs" 2>/dev/null)"
+          if [[ -n "$winfile" ]]; then
+            powershell.exe -ExecutionPolicy Bypass -File "$winfile" "$@"
+            rc=$?
+          else
+            echo "❌ Failed converting to Windows path."
+            rc=1
+          fi
+        else
+          echo "❌ .ps1 support requires WSL with powershell.exe and wslpath."
+          rc=1
+        fi
+        ;;
+      plain-file|*)
+        echo "❌ No known runner for: $file"
+        rc=1
+        ;;
+    esac
+
+    echo
+    echo "Exit code: $rc"
+    _cdc_pause
+    return $rc
+  }
+
+  _cdc_collect() {
+    labels=()
+    raw_entries=()
+
+    labels+=("📁 ..")
+    raw_entries+=("..")
+
+    local -a dirs files
+    local f name size label runner tag
+
+    if (( show_hidden )); then
+      dirs=(./*(/N) ./.*/(/N))
+      files=(./*(.N) ./.*(.N))
+    else
+      dirs=(./*(/N))
+      files=(./*(.N))
+    fi
+
+    for f in "${dirs[@]}"; do
+      name="${f#./}"
+      [[ "$name" == "." || "$name" == ".." ]] && continue
+      labels+=($'📁 \033[1;34m'"$name/"$'\033[0m')
+      raw_entries+=("$name/")
+    done
+
+    for f in "${files[@]}"; do
+      name="${f#./}"
+      [[ "$name" == "." || "$name" == ".." ]] && continue
+
+      runner="$(_cdc_detect_runner "$f" 2>/dev/null)"
+      size="$(_cdc_hr_size "$(wc -c < "$f" 2>/dev/null || echo 0)")"
+
+      case "$runner" in
+        python)     tag="🐍" ;;
+        ruby)       tag="💎" ;;
+        bash)       tag="🐚" ;;
+        zsh)        tag="⚡" ;;
+        exec)       tag="⚙️ " ;;
+        cmd)        tag="🪟" ;;
+        powershell) tag="🔷" ;;
+        shebang)    tag="🚀" ;;
+        plain-file) tag="📄" ;;
+        *)          tag="📄" ;;
+      esac
+
+      if [[ -L "$f" ]]; then
+        label=$'🔗 \033[1;36m'"$name"$'\033[0m'
+        size="-"
+      elif [[ -x "$f" ]]; then
+        label=$"$tag "'\033[1;32m'"$name"$'\033[0m'
+      else
+        label="$tag $name"
+      fi
+
+      labels+=("$(printf '%-56s %8s' "$label" "$size")")
+      raw_entries+=("$name")
+    done
+
+    total=${#labels[@]}
+    (( total < 1 )) && total=1
+    (( selected < 1 )) && selected=1
+    (( selected > total )) && selected=$total
+  }
+
+  _cdc_draw() {
+    clear
+    echo
+    echo "📂 cdc browser"
+    echo "$PWD"
+    echo
+    echo "↑ ↓ move   → enter dir   ← up   Enter select/exit   q quit"
+    echo ". toggle hidden files"
+    echo
+
+    local idx
+    for (( idx=1; idx<=${#labels[@]}; idx++ )); do
+      if (( idx == selected )); then
+        printf ' \033[1;35m>\033[0m %b\n' "${labels[idx]}"
+      else
+        printf '   %b\n' "${labels[idx]}"
+      fi
+    done
+  }
+
+  _cdc_file_menu() {
+    local file="$1"
+    local runner
+    local -a run_args
+
+    runner="$(_cdc_detect_runner "$file" 2>/dev/null)"
+    [[ -z "$runner" ]] && runner="plain-file"
+
+    while true; do
+      clear
+      echo
+      echo "📄 File: $file"
+      echo "Type: $runner"
+      echo
+      echo "[r] run with custom args"
+      echo "[h] run with -h"
+      echo "[x] chmod +x then run"
+      echo "[i] file info"
+      echo "[c] cat"
+      echo "[n] nano"
+      echo "[v] vim"
+      echo "[l] less"
+      echo "[q] cancel"
+      echo
+
+      read -rs -k1 action
+
+      case "$action" in
+        r)
+          clear
+          echo
+          echo "📄 File: $file"
+          echo "Type: $runner"
+          echo
+          echo "Enter arguments for script run."
+          echo "Press Enter for none."
+          _cdc_prompt_run_args
+          run_args=("${(@)REPLY}")
+          _cdc_run_file "$file" "${run_args[@]}"
+          return 0
+          ;;
+        h)
+          _cdc_run_file "$file" "-h"
+          return 0
+          ;;
+        x)
+          chmod +x -- "$file" 2>/dev/null
+          clear
+          echo
+          echo "📄 File: $file"
+          echo "Marked executable where permitted."
+          echo
+          echo "Enter arguments for script run."
+          echo "Press Enter for none."
+          _cdc_prompt_run_args
+          run_args=("${(@)REPLY}")
+          _cdc_run_file "$file" "${run_args[@]}"
+          return 0
+          ;;
+        i)
+          _cdc_file_info "$file"
+          ;;
+        c)
+          clear
+          command cat -- "$file"
+          _cdc_pause
+          return 0
+          ;;
+        n)
+          command nano -- "$file"
+          return 0
+          ;;
+        v)
+          command vim -- "$file"
+          return 0
+          ;;
+        l)
+          command less -- "$file"
+          return 0
+          ;;
+        q)
+          return 0
+          ;;
+      esac
+    done
+  }
+
+  # -------------------------------------------------------
+  # Main loop
+  # -------------------------------------------------------
+  while true; do
+    _cdc_collect
+    _cdc_draw
+
+    read -rs -k1 key
+
+    case "$key" in
+      q)
+        echo
+        return 0
+        ;;
+      .)
+        (( show_hidden = ! show_hidden ))
+        selected=1
+        continue
+        ;;
+      ' ')
+        continue
+        ;;
+      $'\n'|$'\r')
+        choice="${raw_entries[selected]}"
+
+        if [[ "$choice" == ".." ]]; then
+          builtin cd .. || return 1
+          return 0
+        elif [[ "$choice" == */ ]]; then
+          builtin cd -- "${choice%/}" || return 1
+          return 0
+        else
+          _cdc_file_menu "$choice"
+        fi
+        ;;
+      $'\x1b')
+        read -rs -k1 k2
+        if [[ "$k2" == "[" ]]; then
+          read -rs -k1 k3
+          case "$k3" in
+            A) (( selected-- )) ;;   # up
+            B) (( selected++ )) ;;   # down
+            C)                       # right
+              choice="${raw_entries[selected]}"
+              if [[ "$choice" == ".." ]]; then
+                builtin cd .. || return 1
+                selected=1
+              elif [[ "$choice" == */ ]]; then
+                builtin cd -- "${choice%/}" || return 1
+                selected=1
+              else
+                _cdc_file_menu "$choice"
+              fi
+              ;;
+            D)                       # left
+              builtin cd .. || return 1
+              selected=1
+              ;;
+          esac
+        else
+          return 0
+        fi
+        ;;
+    esac
+
+    (( selected < 1 )) && selected=$total
+    (( selected > total )) && selected=1
+  done
+}

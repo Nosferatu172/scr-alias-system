@@ -1,0 +1,10 @@
+Line 1: This is a test file for splitting
+Line 2: It has multiple lines
+Line 3: Each line contains some text
+Line 4: The split function should divide this
+Line 5: Into smaller chunks
+Line 6: Based on the specified number
+Line 7: Of lines per file
+Line 8: This is line 8
+Line 9: This is line 9
+Line 10: This is the final line

@@ -1,0 +1,8 @@
+{
+  "logs": "deny",
+  "swap": "deny",
+  "keys": "deny",
+  "bsh": "allow",
+  "zpy": "allow",
+  "zru": "allow"
+}

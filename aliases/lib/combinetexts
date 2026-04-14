@@ -1,0 +1,154 @@
+# [bash-scripts]
+combineurls_clean() {
+    local timestamp
+    timestamp=$(date +%Y%m%d-%H%M%S)
+    local output="combined-$timestamp.txt"
+
+    echo "Combining all .txt files in $(pwd) ..."
+
+    # Step 1: read all lines
+    # Step 2: split by 'https://', re-add the prefix to each piece
+    # Step 3: remove blanks, unwanted strings, dedupe
+    cat ./*.txt 2>/dev/null \
+      | tr '\r' '\n' \
+      | sed 's/https:\/\//\nhttps:\/\//g' \
+      | grep -vE '^\s*$|search|chrome://history' \
+      | awk 'NF && !seen[$0]++' \
+      > "$output"
+
+    if [[ -s "$output" ]]; then
+        echo "All URLs combined into $output (cleaned + duplicates removed)."
+    else
+        echo "No valid URLs found in $(pwd)."
+        rm -f "$output"
+    fi
+}
+# ---------------------------------------------------------------------------------------
+combineurls() {
+    local timestamp
+    timestamp=$(date +%Y%m%d-%H%M%S)
+    local output="combined-$timestamp.txt"
+
+    echo "Combining all .txt files in $(pwd) ..."
+
+    # Step 1: read all lines, split by spaces, one URL per line
+    # Step 2: strip blanks
+    # Step 3: dedupe while preserving first occurrence
+    cat ./*.txt 2>/dev/null \
+      | tr ' ' '\n' \
+      | awk 'NF && !seen[$0]++' \
+      > "$output"
+
+    if [[ -s "$output" ]]; then
+        echo "All URLs combined into $output (duplicates + blanks removed)."
+    else
+        echo "No .txt files found in $(pwd)."
+        rm -f "$output"
+    fi
+}
+
+
+# ---------------------------------------------------------------------------------------
+combinetxt() {
+    # Force bash execution
+    if [ -z "$BASH_VERSION" ]; then
+        echo "Switching to bash for this function..."
+        bash -c "$(declare -f combinetxt); combinetxt"
+        return
+    fi
+
+    local timestamp
+    timestamp=$(date +%Y%m%d-%H%M%S)
+    local output="combined-$timestamp.txt"
+
+    # Make sure output file is empty
+    : > "$output"
+
+    # Find all .txt files in current dir (no -maxdepth to avoid zsh issues)
+    local files
+    IFS=$'\n' read -d '' -r -a files < <(find . -type f -name '*.txt' -print && printf '\0')
+
+    local total_files=${#files[@]}
+    if (( total_files == 0 )); then
+        echo "No .txt files found in $(pwd)."
+        return 1
+    fi
+
+    echo "Found $total_files .txt files. Combining into $output ..."
+
+    local count=0
+
+    for file in "${files[@]}"; do
+        ((count++))
+        echo "[$count/$total_files] Adding $file"
+        cat "$file" >> "$output"
+    done
+
+    # Remove duplicate lines while keeping first occurrence
+    awk '!seen[$0]++' "$output" > "${output}.tmp" && mv "${output}.tmp" "$output"
+
+    echo "All files combined into $output (duplicates removed)."
+}
+
+# ---------------------------------------------------------------------------------------
+# Add this to ~/.zshrc or ~/.bashrc
+
+delete_lines() {
+    if [ -z "$1" ]; then
+        echo "Usage: delete_lines <keyword>"
+        return 1
+    fi
+    keyword="$1"
+    for file in *.txt; do
+        [ -f "$file" ] || continue
+        sed -i "/$keyword/d" "$file"
+    done
+    echo "Lines containing '$keyword' deleted from all .txt files."
+}
+
+# ---------------------------------------------------------------------------------------
+remove_duplicates() {
+    local dir="$PWD"
+    local files=("$dir"/*.txt)
+
+    if [ ! -d "$dir" ]; then
+        echo "The specified directory does not exist."
+        return 1
+    fi
+
+    if [ ${#files[@]} -eq 0 ]; then
+        echo "No .txt files found in $dir"
+        return 1
+    fi
+
+    while true; do
+        echo -e "\nText files in $dir:"
+        local i=1
+        for f in "${files[@]}"; do
+            echo "$i. $(basename "$f")"
+            ((i++))
+        done
+
+        echo -e "\nChoose a file number to remove duplicates from:"
+        echo "'a' to process all .txt files"
+        echo "'e' to exit"
+
+        read -r choice
+
+        if [[ "$choice" == "e" ]]; then
+            break
+        elif [[ "$choice" == "a" ]]; then
+            for f in "${files[@]}"; do
+                awk '!seen[$0]++' "$f" > "${f}.tmp" && mv "${f}.tmp" "$f"
+                echo "Duplicates removed from $(basename "$f")"
+            done
+        elif [[ "$choice" =~ '^[0-9]+$' ]] && (( choice > 0 && choice <= ${#files[@]} )); then
+            local f="${files[choice-1]}"
+            awk '!seen[$0]++' "$f" > "${f}.tmp" && mv "${f}.tmp" "$f"
+            echo "Duplicates removed from $(basename "$f")"
+        else
+            echo "Invalid selection. Please try again."
+        fi
+    done
+}
+# [/bash-scripts]

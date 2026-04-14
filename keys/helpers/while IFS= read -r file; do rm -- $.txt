@@ -1,0 +1,22 @@
+while IFS= read -r file; do rm -- "$file"; done << 'EOF'
+/mnt/f/Wyvern/Music/clm/Active-org/Alex's List/Masked Wolf - Astronaut In The Ocean (Ibrahim & Ømer Remix).mp4
+/mnt/f/Wyvern/Music/clm/Active-org/CRYJAXX/CryJaxx - Candy Shop (feat. Junior Charles).mp4
+/mnt/f/Wyvern/Music/clm/Active-org/GANGSTER GANG/$uicideboy$ - LTE (KEAN DYSSO Remix) ｜ Mustang GT Showtime.mp4
+/mnt/f/Wyvern/Music/clm/Active-org/HELLFXRMANCE/EMINEM - A＊＊ Like That (TERMIK Remix).mp4
+/mnt/f/Wyvern/Music/clm/Active-org/KEAN DYSSO/BLACKVETTE - Blacked BMW.mp4
+/mnt/f/Wyvern/Music/clm/Active-org/KEAN DYSSO/BONES - RightClickSaveIt (BLACKVETTE Remix) Deep House Remix.mp4
+/mnt/f/Wyvern/Music/clm/Active-org/KEAN DYSSO/CryJaxx - In Da Club (feat. Noise Affairs & Junior Charles).mp4
+/mnt/f/Wyvern/Music/clm/Active-org/KEAN DYSSO/DITØ MØRE - Monster.mp4
+/mnt/f/Wyvern/Music/clm/Active-org/KEAN DYSSO/KEAN DYSSO - Bad and Boujee ⧸w Butterfly (TikTok Music).mp4
+/mnt/f/Wyvern/Music/clm/Active-org/KEAN DYSSO/KEAN DYSSO - Keep Rollin Sidewayz.mp4
+/mnt/f/Wyvern/Music/clm/Active-org/KEAN DYSSO/Libercio - Flutter.mp4
+/mnt/f/Wyvern/Music/clm/Active-org/KEAN DYSSO/Mihaylov - Paka Poka.mp4
+/mnt/f/Wyvern/Music/clm/Active-org/KEAN DYSSO/ReMan - I Like To Move It.mp4
+/mnt/f/Wyvern/Music/clm/Active-org/KEAN DYSSO/Sinny & 7VVCH - Numb.mp4
+/mnt/f/Wyvern/Music/clm/Active-org/MrMoMMusic/Elley Duhe - MONEY ON THE DASH ｜ Animated Video.mp4
+/mnt/f/Wyvern/Music/clm/Active-org/Petra/5etra - Alive.mp4
+/mnt/f/Wyvern/Music/clm/Active-org/Petra/yellow house - 5etra.mp4
+/mnt/f/Wyvern/Music/clm/Active-org/Sinny/Sinny & 7vvch - Petrunko (Numb： Slowed Remix).mp4
+/mnt/f/Wyvern/Music/clm/Active-org/Sinny/Sinny - War Ready.mp4
+/mnt/f/Wyvern/Music/clm/Active-org/Zoze7667 Tv/Hey Mama GMV.mp4
+EOF

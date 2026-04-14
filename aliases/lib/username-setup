@@ -1,0 +1,38 @@
+# ---------------------------------------------------------------------------------------
+# Module: winprofile
+# Purpose: Resolve Windows user profile path reliably in WSL
+# ---------------------------------------------------------------------------------------
+
+# Prevent re-running
+[ -n "$WINPROFILE_READY" ] && return
+
+# --- Detection Logic ---
+resolve_winprofile() {
+
+    # 1. Fast path (works in most WSL setups)
+    if [ -d "/mnt/c/Users//$USER" ]; then
+        echo "/mnt/c/Users//$USER"
+        return
+    fi
+
+    # 2. Fallback: detect most recently used real user folder
+    local detected
+    detected=$(ls -td /mnt/c/Users//* 2>/dev/null \
+        | grep -vE 'Public|Default|All Users|defaultuser0' \
+        | head -n 1)
+
+    if [ -n "$detected" ]; then
+        echo "$detected"
+        return
+    fi
+
+    # 3. Final fallback (safe default)
+    echo "/c/Users/"
+}
+
+# --- Set Variable ---
+export WINPROFILE="$(resolve_winprofile)"
+export WINPROFILE_READY=1
+
+# --- Optional Debug ---
+# echo "[winprofile] -> $WINPROFILE"

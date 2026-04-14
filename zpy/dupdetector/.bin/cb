@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+
+ROOT="/mnt/c/scr/zpy/dupdetector"
+VENV="$ROOT/.venv"
+
+# Ensure venv exists
+if [ ! -d "$VENV" ]; then
+    echo "⚠ venv missing — reinstalling..."
+    bash "$ROOT/install.sh"
+fi
+
+source "$VENV/bin/activate"
+export PYTHONPATH="$ROOT:$PYTHONPATH"
+
+CMD="$1"
+shift || true
+
+case "$CMD" in
+
+    run)
+        PYTHONPATH="$ROOT" python3 -m codebrain.main "$@"
+        ;;
+
+    deps)
+        echo "🧠 Regenerating requirements.txt..."
+        pipreqs "$ROOT" --force --ignore "$ROOT/.venv"
+        ;;
+
+    verify)
+        bash "$ROOT/verify_core_integrity.sh"
+        ;;
+
+    lock)
+        bash "$ROOT/lock_codebrain.sh"
+        ;;
+
+    heal)
+        bash "$ROOT/self_heal_codebrain.sh"
+        ;;
+
+    reset)
+        bash "$ROOT/reset.sh"
+        ;;
+
+    doctor)
+        echo "🧠 CodeBrain health check..."
+        python3 -c "import codebrain.main; print('✔ import OK')"
+        pip check || true
+        ;;
+
+    help|--help|"")
+        echo "cb commands:"
+        echo "  cb run <path>"
+        echo "  cb deps"
+        echo "  cb verify"
+        echo "  cb lock"
+        echo "  cb heal"
+        echo "  cb reset"
+        echo "  cb doctor"
+        ;;
+
+    *)
+        echo "Unknown command: $CMD"
+        echo "Try: cb help"
+        ;;
+esac

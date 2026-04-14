@@ -1,0 +1,4 @@
+pdfkit
+python3-env
+libswresample-dev libflac-dev
+qzip

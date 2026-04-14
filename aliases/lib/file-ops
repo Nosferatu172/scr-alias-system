@@ -1,0 +1,137 @@
+# =========================================================================================
+# [ File & Music Operations - Repair and Edit ]
+# =========================================================================================
+# Created By: Tyler Jensen
+# Email: tylerjensen5@yahoo.com
+# Date: 10/04/2025
+# Version: 01/22/0001
+# =======================================================================================
+# To View Commands Type In "als."
+# =======================================================================================
+# Commands to find this Page:
+# [als]
+alias alsops="less /mnt/c/scr/aliases/lib/act/file-ops"
+alias e-alsops="nano /mnt/c/scr/aliases/lib/act/file-ops"
+# [/als]
+# ---------------------------------------------------------------------------------------
+# Commands:
+# Video conversion (universal compatibility).
+#alias repairmp3='find $(pwd) -type f -iname "*.mp3" -exec ffmpeg -i {} -codec:a libmp3lame -qscale:a 2 {}_repaired.mp3 \;'
+#alias repairmedia='find $(pwd) -type f -iname "*.*" -exec sh -c "ffmpeg -i \"$1\" -codec:a libmp3lame -qscale:a 2 \"${1%.*}_repaired.mp3\" && ffmpeg -i \"$1\" -codec:v libx264 -preset fast -crf 23 \"${1%.*}_repaired.mp4\"" _ {} \;'
+#alias repairmedia='find $(pwd) -type f \( -iname "*.mp3" -o -iname "*.mp4" \) -exec sh -c "ffmpeg -i \"$1\" -codec:a libmp3lame -qscale:a 2 \"${1%.*}_repaired.mp3\" && ffmpeg -i \"$1\" -codec:v libx264 -preset fast -crf 23 \"${1%.*}_repaired.mp4\"" _ {} \;'
+##alias repairmp4='find "$(pwd)" -type f -iname "*.mp4" -exec sh -c '\''ffmpeg -i "$1" -codec:v libx264 -preset fast -crf 23 "${1%.*}_repaired.mp4"'\'' _ {} \;'
+
+#alias ffconvert='mkdir -p converted && for f in *; do ffmpeg -i "$f" "converted/${f%.*}.mp4"; done'
+
+#alias mp4tomp3='mkdir -p converted && for f in *.mp4; do [ -f "$f" ] && ffmpeg -i "$f" -q:a 0 -map a "converted/${f%.mp4}.mp3"; done'
+
+#alias repairmp4='find "$(pwd)" -type f -iname "*.mp4" -exec sh -c '\'' \
+#  for filepath; do \
+#    relpath="${filepath#$(pwd)/}"; \
+#    outdir="repaired/$(dirname "$relpath")"; \
+#    mkdir -p "$outdir"; \
+#    outname="$(basename "$relpath")"; \
+#    ffmpeg -i "$filepath" -codec:v libx264 -preset fast -crf 23 "$outdir/$outname"; \
+#  done \
+#'\'' _ {} +'
+
+# MP3 FILE REPAIR.
+#alias repairmp3='find "$(pwd)" -type f -iname "*.mp3" -exec sh -c '\'' \
+#  for filepath; do \
+#    relpath="${filepath#$(pwd)/}"; \
+#    outdir="repaired/$(dirname "$relpath")"; \
+#    mkdir -p "$outdir"; \
+#    outname="$(basename "$relpath")"; \
+#    outpath="$outdir/$outname"; \
+#    if [ -f "$outpath" ]; then \
+#      echo "Skipping $outpath (already exists)"; \
+#    else \
+#      ffmpeg -i "$filepath" -codec:a libmp3lame -qscale:a 2 "$outpath"; \
+#    fi; \
+#  done \
+#'\'' _ {} +'
+
+process_txt_loop() {
+  local txt_dir="/c/Users/$WINUSERDocuments/brave"
+
+  while true; do
+    # Find the first .txt file
+    txt_file=$(find "$txt_dir" -maxdepth 1 -type f -name "*.txt" | sort | head -n 1)
+
+    # Exit if no .txt files left
+    if [ -z "$txt_file" ]; then
+      echo "🎉 All .txt files processed. Loop complete."
+      break
+    fi
+
+    echo "🔍 Checking if download of $(basename "$txt_file") is complete..."
+
+    # Wait for file to stop changing size (download finished)
+    local size1 size2
+    size1=$(stat -c%s "$txt_file")
+    sleep 2
+    size2=$(stat -c%s "$txt_file")
+
+    while [ "$size1" != "$size2" ]; do
+      echo "⏳ File is still downloading... waiting..."
+      size1=$size2
+      sleep 2
+      size2=$(stat -c%s "$txt_file")
+    done
+
+    echo "✅ File ready: $(basename "$txt_file")"
+
+    # Step 1: Set the target file (assumed to export its path somewhere `music-clm` can use)
+    setxt "$txt_file"
+
+    # Step 2: Run downloader (should read from the path set above)
+    music-clm
+
+    # Step 3: Delete the file
+    dt
+
+    echo "🌀 Finished processing: $(basename "$txt_file")"
+    echo "🔁 Moving to next file if available..."
+    sleep 1
+  done
+}
+alias testmp4='ffmpeg -i "$file" -c:v libx264 -preset medium -crf 23 -c:a aac -b:a 192k "${file%.mp4}_converted.mp4"'
+alias test2mp4='for file in *.mp4; do ffmpeg -i "$file" "${file%.mp4}_converted.mp4"; done'
+# MP4 File REPAIR.
+alias repairmp4bsh='find "$(pwd)" -type f -iname "*.mp4" -exec sh -c '\'' \
+  for filepath; do \
+    relpath="${filepath#$(pwd)/}"; \
+    outdir="repaired/$(dirname "$relpath")"; \
+    mkdir -p "$outdir"; \
+    outname="$(basename "$relpath")"; \
+    outpath="$outdir/$outname"; \
+    if [ -f "$outpath" ]; then \
+      echo "Skipping $outpath (already exists)"; \
+    else \
+      ffmpeg -i "$filepath" -codec:v libx264 -preset fast -crf 23 "$outpath"; \
+    fi; \
+  done \
+'\'' _ {} +'
+# Convert mp4 or Mov files to mp3
+vidtomp3() {
+  for ext in mp4 mov; do
+    for file in ./*.$ext; do
+      [ -f "$file" ] || continue
+      base="${file%.*}"
+      output="${base}.mp3"
+      if [ -f "$output" ]; then
+        echo "Skipping: $output already exists."
+      else
+        echo "Converting: $file → $output"
+        ffmpeg -i "$file" -vn -acodec libmp3lame -q:a 2 "$output"
+      fi
+    done
+  done
+}
+# Hits and keeps all folders the vids are in to keep organization
+
+# [convert]
+# webm files to mp3
+alias webm2mp3='for f in *.webm; do ffmpeg -i "$f" -vn -ar 44100 -ac 2 -b:a 192k "${f%.webm}.mp3"; done'
+alias auto-repair-media='find "$(pwd)" -type f \( -iname "*.mp3" -o -iname "*.mp4" \) -exec sh -c '\''for filepath; do relpath="${filepath#$(pwd)/}"; outdir="repaired/$(dirname "$relpath")"; mkdir -p "$outdir"; outname="$(basename "$relpath")"; outpath="$outdir/$outname"; if [ -f "$outpath" ]; then echo "Skipping $outpath (already exists)"; continue; fi; if ffmpeg -v error -i "$filepath" -f null - 2>&1 | grep -qE "error|Invalid|decode|malformed"; then ext="${filepath##*.}"; if [ "$ext" = "mp3" ]; then ffmpeg -i "$filepath" -codec:a libmp3lame -qscale:a 2 "$outpath"; elif [ "$ext" = "mp4" ]; then ffmpeg -i "$filepath" -codec:v libx264 -preset fast -crf 23 -codec:a aac -b:a 192k "$outpath"; fi; else echo "OK: $filepath"; fi; done'\'' _ {} +'
+# [/convert]

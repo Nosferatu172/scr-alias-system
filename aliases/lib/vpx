@@ -1,0 +1,272 @@
+# =========================================================
+# VPX — single-file plugin system
+# =========================================================
+
+# ---------------------------------------------------------
+# LOAD GUARD (safe + reloadable)
+# ---------------------------------------------------------
+[[ -n "${VPX_LOADED:-}" ]] && return
+VPX_LOADED=1
+
+# =========================================================
+# CORE
+# =========================================================
+
+_vpx_echo() { printf '%s\n' "$*"; }
+_vpx_err()  { printf '❌ %s\n' "$*" >&2; }
+_vpx_ok()   { printf '✅ %s\n' "$*"; }
+_vpx_warn() { printf '⚠️ %s\n' "$*" >&2; }
+
+_vpx_cmd_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+_vpx_get_caller_pwd() {
+  pwd
+}
+
+_vpx_is_valid_venv() {
+  [[ -d "$1" && ( -f "$1/bin/activate" || -x "$1/bin/python" ) ]]
+}
+
+# ---------------------------------------------------------
+# FIND
+# ---------------------------------------------------------
+
+_vpx_find_up() {
+  local dir="$(_vpx_get_caller_pwd)"
+
+  while [[ -n "$dir" ]]; do
+    for n in .lvenv .mvenv .nvenv .ovenv .pvenv .xvenv .yvenv .wvenv .vvenv .zvenv; do
+      if _vpx_is_valid_venv "$dir/$n"; then
+        echo "$dir/$n"
+        return 0
+      fi
+    done
+
+    [[ "$dir" == "/" ]] && break
+    dir="$(dirname "$dir")"
+  done
+
+  return 1
+}
+
+# ---------------------------------------------------------
+# ACTIVATE
+# ---------------------------------------------------------
+
+_vpx_activate_path() {
+  local venv="$1"
+
+  [[ -f "$venv/bin/activate" ]] || {
+    _vpx_err "Invalid venv: $venv"
+    return 1
+  }
+
+  if [[ -n "$VIRTUAL_ENV" ]] && type deactivate >/dev/null 2>&1; then
+    deactivate 2>/dev/null
+  fi
+
+  source "$venv/bin/activate"
+  _vpx_ok "Activated: $venv"
+}
+
+# ---------------------------------------------------------
+# PYTHON PICKER
+# ---------------------------------------------------------
+
+_vpx_python_choice() {
+  for c in python3.13 python3.12 python3.11 python3.10 python3; do
+    _vpx_cmd_exists "$c" && { echo "$c"; return; }
+  done
+  return 1
+}
+
+# ---------------------------------------------------------
+# CREATE (EXPLICIT)
+# ---------------------------------------------------------
+
+_vpx_new() {
+  local name="$1"
+  local dir="$(_vpx_get_caller_pwd)"
+
+  [[ -z "$name" ]] && name=".vvenv"
+
+  local venv="$dir/$name"
+
+  if [[ -d "$venv" ]]; then
+    _vpx_err "Already exists: $venv"
+    return 1
+  fi
+
+  local py="$(_vpx_python_choice)" || {
+    _vpx_err "No python found"
+    return 1
+  }
+
+  _vpx_echo "[vpx] creating: $venv"
+  _vpx_echo "[vpx] python: $py"
+
+  "$py" -m venv "$venv" || {
+    _vpx_err "Failed to create venv"
+    return 1
+  }
+
+  _vpx_ok "Created: $venv"
+  _vpx_activate_path "$venv"
+}
+
+# ---------------------------------------------------------
+# TURN ON (AUTO)
+# ---------------------------------------------------------
+
+_vpx_turn_on() {
+  local found="$(_vpx_find_up)"
+
+  if [[ -n "$found" ]]; then
+    _vpx_activate_path "$found"
+  else
+    _vpx_warn "No venv found, creating .vvenv..."
+    _vpx_new ".vvenv"
+  fi
+}
+
+# ---------------------------------------------------------
+# REMOVE
+# ---------------------------------------------------------
+
+_vpx_remove() {
+  local v="$(_vpx_find_up)" || {
+    _vpx_err "No venv found."
+    return 1
+  }
+
+  [[ "$v" == "$VIRTUAL_ENV" ]] && deactivate 2>/dev/null
+
+  rm -rf "$v"
+  _vpx_ok "Removed: $v"
+}
+
+# =========================================================
+# LIST
+# =========================================================
+
+_vpx_list() {
+  local dir="$(_vpx_get_caller_pwd)"
+  local found=false
+
+  echo "📦 Searching from: $dir"
+  echo
+
+  while [[ -n "$dir" ]]; do
+    for n in .lvenv .mvenv .nvenv .ovenv .pvenv .xvenv .yvenv .wvenv .vvenv .zvenv; do
+      if _vpx_is_valid_venv "$dir/$n"; then
+        echo "✅ $dir/$n"
+        found=true
+      fi
+    done
+
+    [[ "$dir" == "/" ]] && break
+    dir="$(dirname "$dir")"
+  done
+
+  [[ "$found" == false ]] && _vpx_warn "No venvs found."
+}
+
+# =========================================================
+# DOCTOR
+# =========================================================
+
+_vpx_doctor() {
+  echo "🔍 vpx doctor"
+  echo
+
+  type _vpx_err >/dev/null && echo "✅ core" || echo "❌ core"
+  type vpx >/dev/null && echo "✅ cli" || echo "❌ cli"
+  command -v python3 >/dev/null && echo "✅ python" || echo "❌ python"
+
+  echo
+}
+
+# =========================================================
+# HELP
+# =========================================================
+
+_vpx_help() {
+  cat <<'EOF'
+🧠 vpx — single-file venv system
+
+USAGE:
+  vpx [command]
+
+COMMANDS:
+  run, -r        → activate or auto-create
+  new, -n        → create new venv (optional name)
+  show, -l       → list venvs
+  rm             → remove venv
+  find           → locate venv
+  off            → deactivate
+  doctor         → health check
+
+EXAMPLES:
+  vpx run
+  vpx new
+  vpx new .xvenv
+  vpx -l
+
+EOF
+}
+
+# =========================================================
+# CLI
+# =========================================================
+
+vpx() {
+  local cmd="$1"
+
+  case "$cmd" in
+    ""|-h|--h|help|-help|--help|fuckoff)
+      _vpx_help
+      ;;
+
+    on|run|-r)
+      _vpx_turn_on
+      ;;
+
+    new|-n)
+      _vpx_new "$2"
+      ;;
+
+    show|list|-l)
+      _vpx_list
+      ;;
+
+    off)
+      if type deactivate >/dev/null 2>&1; then
+        deactivate
+        _vpx_ok "Deactivated"
+      else
+        _vpx_warn "No active venv"
+      fi
+      ;;
+
+    find)
+      _vpx_find_up || _vpx_err "No venv found."
+      ;;
+
+    rm|remove)
+      _vpx_remove
+      ;;
+
+    doctor)
+      _vpx_doctor
+      ;;
+
+    *)
+      _vpx_err "Unknown command: $cmd"
+      echo
+      _vpx_help
+      return 1
+      ;;
+  esac
+}

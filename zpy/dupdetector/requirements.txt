@@ -1,0 +1,9 @@
+numpy
+gitpython
+pytest
+tqdm
+requests
+
+# optional AI layer
+openai
+sentence-transformers

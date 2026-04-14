@@ -1,0 +1,40 @@
+# List of shebangs and how to make them executable from anywhere in the system
+```
+#!/usr/bin/env bash
+```
+#!/usr/bin/env python3
+```
+```
+#!/usr/bin/env ruby
+```
+
+```
+bash script.sh
+python3 script.py
+ruby script.rb
+```
+
+
+```
+check if it worked:
+
+ls -l script.sh
+
+```
+
+
+``` 
+from another directory
+
+chmod +x /path/to/file/script.example
+```
+
+```
+then you can launch it as such
+./script.sh
+```
+
+``` 
+to remove the executable
+
+chmod -x filename.example

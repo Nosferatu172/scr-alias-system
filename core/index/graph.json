@@ -1,0 +1,5 @@
+{
+  "scrwork": ["scrid", "id-search"],
+  "yt-download": ["fileops", "downloader"],
+  "music-tools": ["fileops", "meta-remover-sub"]
+}

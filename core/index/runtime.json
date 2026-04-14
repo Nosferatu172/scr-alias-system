@@ -1,0 +1,6 @@
+{
+  "bash": "bash",
+  "zsh": "zsh",
+  "python": "python3",
+  "ruby": "ruby"
+}

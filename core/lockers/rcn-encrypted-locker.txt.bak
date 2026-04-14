@@ -1,0 +1,350 @@
+# =====================================
+# SCR BOOTSTRAP (CLEAN + STABLE)
+# =====================================
+
+SCR_ROOT="/mnt/c/scr"
+CORE_DIR="$SCR_ROOT/core"
+
+# --------------------------------------------------
+# ENVIRONMENT
+# --------------------------------------------------
+
+export SCR_ROOT
+export CORE_DIR
+
+# --------------------------------------------------
+# SHARED LIB LOADING
+# --------------------------------------------------
+
+if [ -d "$SCR_ROOT/aliases/lib" ]; then
+    for libfile in "$SCR_ROOT/aliases/lib/"*; do
+        [ -f "$libfile" ] && source "$libfile"
+    done
+fi
+
+# --------------------------------------------------
+# CORE ENTRYPOINTS (NO EXECUTION SIDE EFFECTS)
+# --------------------------------------------------
+
+scr() {
+    "$CORE_DIR/dispatcher.sh" "$@"
+}
+
+scre() {
+    "$CORE_DIR/editor.sh" "$@"
+}
+
+# --------------------------------------------------
+# CODEBRAIN WRAPPER (PIPELINE ONLY)
+# --------------------------------------------------
+
+scr_cb() {
+    local CB_ROOT="/mnt/c/scr/zpy/dupdetector"
+
+    if [ ! -d "$CB_ROOT/codebrain" ]; then
+        echo "[SCR] CodeBrain not found:"
+        echo "       $CB_ROOT"
+        return 1
+    fi
+
+    local MODE="$1"
+
+    # If no arguments → default to help
+    if [ $# -eq 0 ]; then
+        MODE="help"
+    else
+        shift
+    fi
+
+    case "$MODE" in
+
+        run)
+            python3 -m codebrain.main "$@"
+            ;;
+
+        verify)
+            bash "$CB_ROOT/verify_core_integrity.sh"
+            ;;
+
+        test)
+            bash "$CB_ROOT/codebrain_test_harness.sh"
+            ;;
+
+        sync)
+            bash "$CB_ROOT/codebrain_sync.sh"
+            ;;
+
+        backup)
+            bash "$CB_ROOT/codebrain_backup_manager.sh" backup
+            ;;
+
+        restore)
+            bash "$CB_ROOT/codebrain_backup_manager.sh" restore "$@"
+            ;;
+
+        help)
+            echo "🧠 CodeBrain (Clean Pipeline Mode)"
+            echo ""
+            echo "Usage:"
+            echo "  scr_cb run <path>"
+            echo "  scr_cb verify"
+            echo "  scr_cb test"
+            echo "  scr_cb sync"
+            echo "  scr_cb backup"
+            echo "  scr_cb restore [file]"
+            echo ""
+            ;;
+
+        *)
+            echo "❌ Unknown mode: $MODE"
+            echo "Try: scr_cb help"
+            return 1
+            ;;
+    esac
+}           
+
+[[ -n "$ZSH_VERSION" ]] || return 0
+
+# =========================================================================================
+# 🧠 FREEZE COMMAND (CDC-STYLE CONTROL LAYER)
+# =========================================================================================
+# Name: freeze
+# Mode: filesystem state lock / restore / verify
+# Behavior: manual invocation only (NO auto execution)
+# =========================================================================================
+
+unalias freeze 2>/dev/null || true
+unset -f freeze 2>/dev/null || true
+
+freeze() {
+  emulate -L zsh
+  setopt localoptions nullglob extendedglob no_aliases
+
+  local MODE="${1:-help}"
+  local TARGET="${2:-.}"
+
+  local ROOT="$PWD"
+  local FREEZE_DIR="$ROOT/.freeze_state"
+  local MANIFEST="$FREEZE_DIR/manifest.txt"
+  local LOG="$FREEZE_DIR/freeze.log"
+
+  mkdir -p "$FREEZE_DIR"
+
+  # --------------------------------------------------
+  # HELP
+  # --------------------------------------------------
+  _freeze_help() {
+    cat << 'EOF'
+
+🧠======================================
+           FREEZE COMMAND
+======================================
+
+NAME:
+    freeze — controlled filesystem lock system
+
+USAGE:
+    freeze freeze [target]
+    freeze thaw [target]
+    freeze verify [target]
+    freeze help
+
+TARGET:
+    Optional path (defaults to current directory)
+
+--------------------------------------
+
+MODES:
+
+❄ freeze
+    Locks files + directories:
+    - files → chmod 444
+    - dirs  → chmod 555
+    - optional manifest snapshot
+
+🔓 thaw
+    Restores safe writable state:
+    - files → chmod 644
+    - dirs  → chmod 755
+
+🛡 verify
+    Compares SHA256 snapshot vs current state
+    Detects modification or deletion
+
+--------------------------------------
+
+SAFETY RULES:
+
+NEVER locks:
+    .git
+    __pycache__
+    .venv
+    node_modules
+
+--------------------------------------
+
+EXAMPLE:
+
+    freeze freeze .
+    freeze thaw .
+    freeze verify
+
+--------------------------------------
+
+NOTES:
+
+✔ Does NOT auto-run anything
+✔ Safe for dev environments
+✔ Works like a CDC-style interactive command
+✔ Requires explicit invocation
+
+======================================
+
+EOF
+  }
+
+  # --------------------------------------------------
+  # EXCLUDE RULES
+  # --------------------------------------------------
+  local EXCLUDES=(
+    ".git"
+    "__pycache__"
+    ".venv"
+    "node_modules"
+    ".idea"
+  )
+
+  _freeze_find() {
+    local dir="$1"
+    local expr=""
+
+    for e in "${EXCLUDES[@]}"; do
+      expr="$expr -path \"*/$e\" -o"
+    done
+
+    expr="${expr::-3}"
+    eval "find \"$dir\" \\( $expr \\) -prune -o -print"
+  }
+
+  # --------------------------------------------------
+  # SNAPSHOT (ENCRYPTION LAYER = HASH MANIFEST)
+  # --------------------------------------------------
+  _freeze_snapshot() {
+    echo "🧾 Creating snapshot..."
+
+    > "$MANIFEST"
+
+    _freeze_find "$TARGET" | while read -r f; do
+      [[ -f "$f" ]] || continue
+      hash=$(sha256sum "$f" 2>/dev/null | awk '{print $1}')
+      echo "$hash|$f" >> "$MANIFEST"
+    done
+
+    echo "✔ snapshot saved"
+  }
+
+  # --------------------------------------------------
+  # FREEZE
+  # --------------------------------------------------
+  _freeze_lock() {
+    echo "❄ FREEZE MODE"
+    echo "📍 Target: $TARGET"
+
+    _freeze_snapshot
+
+    _freeze_find "$TARGET" | while read -r item; do
+
+      [[ -e "$item" ]] || continue
+
+      if [[ -d "$item" ]]; then
+        chmod 555 "$item" 2>/dev/null || true
+      else
+        chmod 444 "$item" 2>/dev/null || true
+      fi
+
+      echo "LOCKED: $item" >> "$LOG"
+    done
+
+    echo "✔ FREEZE COMPLETE"
+  }
+
+  # --------------------------------------------------
+  # THAW
+  # --------------------------------------------------
+  _freeze_thaw() {
+    echo "🔓 THAW MODE"
+    echo "📍 Target: $TARGET"
+
+    _freeze_find "$TARGET" | while read -r item; do
+
+      [[ -e "$item" ]] || continue
+
+      if [[ -d "$item" ]]; then
+        chmod 755 "$item" 2>/dev/null || true
+      else
+        chmod 644 "$item" 2>/dev/null || true
+      fi
+
+    done
+
+    echo "✔ THAW COMPLETE"
+  }
+
+  # --------------------------------------------------
+  # VERIFY
+  # --------------------------------------------------
+  _freeze_verify() {
+    echo "🛡 VERIFY MODE"
+
+    [[ -f "$MANIFEST" ]] || {
+      echo "❌ No snapshot found"
+      return 1
+    }
+
+    while IFS="|" read -r hash file; do
+      [[ -f "$file" ]] || {
+        echo "❌ MISSING: $file"
+        continue
+      }
+
+      current=$(sha256sum "$file" 2>/dev/null | awk '{print $1}')
+
+      [[ "$hash" != "$current" ]] && echo "⚠ MODIFIED: $file"
+
+    done < "$MANIFEST"
+
+    echo "✔ VERIFY COMPLETE"
+  }
+
+  # --------------------------------------------------
+  # ROUTER
+  # --------------------------------------------------
+  case "$MODE" in
+    freeze)  _freeze_lock ;;
+    thaw)    _freeze_thaw ;;
+    verify)  _freeze_verify ;;
+    help|-h|--help|"") _freeze_help ;;
+    *) echo "❌ Unknown mode: $MODE"; _freeze_help ;;
+  esac
+}
+
+# --------------------------------------------------
+# SAFE ALIASES
+# --------------------------------------------------
+
+alias scrls="ls -la"
+alias scrpath="echo $SCR_ROOT"
+
+# --------------------------------------------------
+# GENERATED COMMANDS
+# --------------------------------------------------
+
+for f in \
+    "$CORE_DIR/index/generated/bash/aliases.sh" \
+    "$CORE_DIR/index/generated/bsh/bsh.sh" \
+    "$CORE_DIR/index/generated/python/tools.sh" \
+    "$CORE_DIR/index/generated/ruby/tools.sh" \
+    "$CORE_DIR/index/generated/zsh/tools.sh"
+do
+    [ -f "$f" ] && source "$f"
+done

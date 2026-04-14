@@ -1,0 +1,5 @@
+name,type,path,enabled,priority,notes
+main_tabs,root,/mnt/c/scr/keys/tabs/brave/,1,1,wsl linux tabs location
+msys_tabs,root,/c/scr/keys/tabs,1,2,msys
+linux_docs,root,/root,0,3,linux
+output_default,output,,1,0,default output
