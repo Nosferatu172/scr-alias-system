@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 # Script Name: kzip.py
 # ID: SCR-ID-20260404035118-YI6FETLHUI
+# Assigned with:
 # Created by: Tyler Jensen
-# Description: Archive utility with zip + tar support, safe extraction, progress, and verbose modes
+# Email: tylerjensen5@yahoo.com
+# Alias Call: kzip
+# Description: Archive utility with safe unzip, progress, and verbose modes
 
 import argparse
 import os
 import signal
 import zipfile
-import tarfile
 from pathlib import Path
-
 
 # -----------------------
 # Ctrl+C handler
@@ -41,7 +42,7 @@ def normalize_posix_path(p: str) -> str:
 # -----------------------
 # Archive helpers
 # -----------------------
-SUPPORTED_ARCHIVES = (".zip", ".tar", ".tar.gz", ".tgz")
+SUPPORTED_ARCHIVES = (".zip")
 
 
 def is_archive(filename: str) -> bool:
@@ -61,16 +62,7 @@ def get_unique_folder(base_path: str) -> str:
 
 
 # -----------------------
-# SAFE TAR CHECK
-# -----------------------
-def is_within_directory(directory, target):
-    abs_directory = os.path.abspath(directory)
-    abs_target = os.path.abspath(target)
-    return os.path.commonpath([abs_directory]) == os.path.commonpath([abs_directory, abs_target])
-
-
-# -----------------------
-# ZIP extraction
+# UNZIP
 # -----------------------
 def unzip_file(filepath: str, extract_here=False, safe=False, verbose=False):
     filepath = normalize_posix_path(filepath)
@@ -85,7 +77,10 @@ def unzip_file(filepath: str, extract_here=False, safe=False, verbose=False):
     if safe:
         target_dir = get_unique_folder(os.path.join(base_dir, name))
     else:
-        target_dir = base_dir if extract_here else get_unique_folder(os.path.join(base_dir, name))
+        if extract_here:
+            target_dir = base_dir
+        else:
+            target_dir = get_unique_folder(os.path.join(base_dir, name))
 
     os.makedirs(target_dir, exist_ok=True)
 
@@ -107,84 +102,14 @@ def unzip_file(filepath: str, extract_here=False, safe=False, verbose=False):
         return 1
 
 
-# -----------------------
-# TAR extraction
-# -----------------------
-def untar_file(filepath: str, extract_here=False, safe=False, verbose=False):
-    filepath = normalize_posix_path(filepath)
-
-    if not tarfile.is_tarfile(filepath):
-        print(f"⚠️ Not a valid tar archive: {filepath}")
-        return 1
-
-    base_dir = os.path.dirname(filepath)
-
-    # Clean name for folder
-    name = os.path.basename(filepath)
-    for ext in [".tar.gz", ".tgz", ".tar"]:
-        if name.endswith(ext):
-            name = name[:-len(ext)]
-            break
-
-    if safe:
-        target_dir = get_unique_folder(os.path.join(base_dir, name))
-    else:
-        target_dir = base_dir if extract_here else get_unique_folder(os.path.join(base_dir, name))
-
-    os.makedirs(target_dir, exist_ok=True)
-
-    try:
-        with tarfile.open(filepath, 'r:*') as tar:
-            members = tar.getmembers()
-
-            for i, member in enumerate(members, 1):
-                member_path = os.path.join(target_dir, member.name)
-
-                # 🔒 Safety check
-                if not is_within_directory(target_dir, member_path):
-                    print(f"⚠️ Skipping unsafe path: {member.name}")
-                    continue
-
-                tar.extract(member, target_dir)
-
-                if verbose:
-                    print(f"   [{i}/{len(members)}] {member.name}")
-
-        print(f"📦 Extracted: {filepath} -> {target_dir}")
-        return 0
-
-    except Exception as e:
-        print(f"❌ Failed to extract tar {filepath}: {e}")
-        return 1
-
-
-# -----------------------
-# DISPATCH extractor
-# -----------------------
-def extract_file(filepath: str, extract_here=False, safe=False, verbose=False):
-    filepath = normalize_posix_path(filepath)
-
-    if zipfile.is_zipfile(filepath):
-        return unzip_file(filepath, extract_here, safe, verbose)
-
-    elif tarfile.is_tarfile(filepath):
-        return untar_file(filepath, extract_here, safe, verbose)
-
-    else:
-        print(f"⚠️ Unsupported archive: {filepath}")
-        return 1
-
-
-# -----------------------
-# DIRECTORY processing
-# -----------------------
-def extract_in_directory(directory: str, extract_here=False, all_files=False,
-                         safe=False, verbose=False, progress=False):
+def unzip_in_directory(directory: str, extract_here=False, all_files=False,
+                        safe=False, verbose=False, progress=False):
 
     directory = normalize_posix_path(directory)
 
+    # Single file case
     if os.path.isfile(directory):
-        return extract_file(directory, extract_here, safe, verbose)
+        return unzip_file(directory, extract_here, safe, verbose)
 
     if not os.path.isdir(directory):
         print(f"❌ Not a valid directory: {directory}")
@@ -193,7 +118,7 @@ def extract_in_directory(directory: str, extract_here=False, all_files=False,
     archives = [f for f in os.listdir(directory) if is_archive(f)]
 
     if not archives:
-        print("⚠️ No archives found.")
+        print("⚠️ No zip files found.")
         return 0
 
     total = len(archives)
@@ -205,7 +130,7 @@ def extract_in_directory(directory: str, extract_here=False, all_files=False,
         if progress:
             print(f"📦 [{i}/{total}] Processing: {filename}")
 
-        extract_file(filepath, extract_here, safe, verbose)
+        unzip_file(filepath, extract_here, safe, verbose)
         processed += 1
 
         if not all_files:
@@ -216,7 +141,7 @@ def extract_in_directory(directory: str, extract_here=False, all_files=False,
 
 
 # -----------------------
-# ZIP creation
+# ZIP
 # -----------------------
 def zip_directory(directory: str, output_name=None):
     directory = normalize_posix_path(directory)
@@ -249,21 +174,26 @@ def zip_directory(directory: str, output_name=None):
 # -----------------------
 def main() -> int:
     parser = argparse.ArgumentParser(
-        prog="kzip",
-        description="Archive tool with zip + tar support, safe extraction, progress, and verbose modes."
+        prog="cop",
+        description="Archive tool with safe unzip, progress, and verbose modes."
     )
 
     parser.add_argument("path", nargs="*", help="Target path")
 
-    parser.add_argument("--unzip", action="store_true", help="Extract archive(s).")
+    parser.add_argument("--unzip", action="store_true", help="Unzip archive(s).")
     parser.add_argument("--zip", action="store_true", help="Zip a directory.")
 
     parser.add_argument("--all", action="store_true", help="Process all archives.")
-    parser.add_argument("--here", action="store_true", help="Extract into current directory.")
+    parser.add_argument("--here", action="store_true", help="Extract into current directory (can mix files).")
 
-    parser.add_argument("--safe", action="store_true", help="Always extract into isolated folders.")
-    parser.add_argument("--verbose", action="store_true", help="Show detailed extraction.")
-    parser.add_argument("--progress", action="store_true", help="Show progress.")
+    parser.add_argument("--safe", action="store_true",
+                        help="Always extract into isolated folders (recommended).")
+
+    parser.add_argument("--verbose", action="store_true",
+                        help="Show detailed file extraction.")
+
+    parser.add_argument("--progress", action="store_true",
+                        help="Show progress while processing.")
 
     parser.add_argument("--zip-name", metavar="NAME", help="Custom zip filename.")
 
@@ -276,12 +206,20 @@ def main() -> int:
     target = normalize_posix_path(input_path)
 
     # Prevent conflicting modes
-    if sum([args.unzip, args.zip]) > 1:
+    special_flags = sum([
+        args.unzip,
+        args.zip,
+    ])
+
+    if special_flags > 1:
         print("❌ Choose only one of --zip or --unzip.")
         return 2
 
+    # -----------------------
+    # UNZIP
+    # -----------------------
     if args.unzip:
-        return extract_in_directory(
+        return unzip_in_directory(
             target,
             extract_here=args.here,
             all_files=args.all,
@@ -290,6 +228,9 @@ def main() -> int:
             progress=args.progress
         )
 
+    # -----------------------
+    # ZIP
+    # -----------------------
     if args.zip:
         return zip_directory(
             target,

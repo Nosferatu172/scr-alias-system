@@ -1,8 +1,8 @@
 kind,name,path,is_default,enabled
 source,main,/mnt/c/scr,1,1
-dest,d,/mnt/d/scr,0,1
-dest,e,/mnt/e/scr,0,1
-dest,f,/mnt/f/scr,0,1
-dest,g,/mnt/g/scr,0,1
-dest,h,/mnt/h/scr,0,1
-dest,i,/mnt/i/scr,0,1
+dest,d,/mnt/d/Wyvern/scr,0,1
+dest,e,/mnt/e/Wyvern/scr,0,1
+dest,f,/mnt/f/Wyvern/scr,0,1
+dest,g,/mnt/g/Wyvern/scr,0,1
+dest,h,/mnt/h/Wyvern/scr,0,1
+dest,i,/mnt/i/Wyvern/scr,0,1

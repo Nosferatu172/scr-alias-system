@@ -57,6 +57,7 @@ alias vidsf='cd "/mnt/d/Wyvern/Videos/clm/" && ls'
 # SCR / TOOLS
 # ---------------------------------------------------------------------------------------
 
+alias indf='cd /mnt/c/scr/core/index/generated/ && ls'
 alias ytf='cd /mnt/c/scr/zru/banshee26/ && ls'
 alias ytf0='cd /mnt/c/scr/zru/banshee27/ && ls'
 alias insf='cd /mnt/c/scr/aliases/ins/ && ls && ~'

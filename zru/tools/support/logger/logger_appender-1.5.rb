@@ -10,8 +10,8 @@ require 'fileutils'
 require 'time'
 
 # === CONFIG ===
-DEFAULT_TARGET_DIR = '/mnt/c/zru2/scripts/'
-DEFAULT_LOG_BASE = '/mnt/c/zru2/logs'
+DEFAULT_TARGET_DIR = '/mnt/c/zru/'
+DEFAULT_LOG_BASE = '/mnt/c/zru/logs'
 BACKUP_DIR = File.join(DEFAULT_LOG_BASE, 'backup', 'logger-appender')
 
 # === HELPERS ===

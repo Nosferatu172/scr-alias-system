@@ -432,7 +432,7 @@ def edit_menu(entries: list[DirEntry]) -> None:
 # Archive helpers
 # =======================
 def build_archive_name() -> str:
-    today = datetime.now().strftime("%m-%d-%Y")
+    today = datetime.now().strftime("%Y-%m-%d")
     return f"scr-{today}.tar.gz"
 
 

@@ -5,3 +5,9 @@ scr_alsd3() { bash "/mnt/c/scr/bsh/alsd/lib/dep/alsd3.sh" "$@"; }
 scr_alsd4() { bash "/mnt/c/scr/bsh/alsd/lib/dep/alsd4.sh" "$@"; }
 scr_alsd5() { bash "/mnt/c/scr/bsh/alsd/lib/dep/alsd5.sh" "$@"; }
 scr_alsd6() { bash "/mnt/c/scr/bsh/alsd/lib/dep/alsd6.sh" "$@"; }
+scr_iap() { bash "/mnt/c/scr/bsh/installs/iap.sh" "$@"; }
+scr_icmus() { bash "/mnt/c/scr/bsh/installs/icmus.sh" "$@"; }
+scr_tty_prompt() { bash "/mnt/c/scr/bsh/installs/tty_prompt.sh" "$@"; }
+scr_mktool() { bash "/mnt/c/scr/bsh/mktoolkit/version/3/mktool.sh" "$@"; }
+scr_scr_git_manager() { bash "/mnt/c/scr/bsh/scr_git_manager.sh" "$@"; }
+scr_tagctl() { bash "/mnt/c/scr/bsh/tagctl.sh" "$@"; }

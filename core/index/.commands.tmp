@@ -1,4 +1,3 @@
-{
 "alsd": "/mnt/c/scr/aliases/bash/alsd.sh",
 "fin": "/mnt/c/scr/aliases/bash/fin.sh",
 "id": "/mnt/c/scr/aliases/bash/id.sh",
@@ -274,5 +273,4 @@
 "klen-json": "/mnt/c/scr/zru/tools/text/klen-json/klen-json.rb",
 "enhanced_text_manager": "/mnt/c/scr/zru/tools/text/setxt/enhanced_text_manager.rb",
 "conflict_flag": "/mnt/c/scr/aliases/zsh/conflict_flag.zsh",
-"scrid2": "/mnt/c/scr/aliases/zsh/scrid2.zsh"
-}
+"scrid2": "/mnt/c/scr/aliases/zsh/scrid2.zsh",

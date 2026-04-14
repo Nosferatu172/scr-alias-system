@@ -6,8 +6,8 @@
 
 set -u
 
-SCRID_CREATED_BY_DEFAULT="Tyler Jensen"
-SCRID_EMAIL_DEFAULT="tylerjensen5@yahoo.com"
+SCRID_CREATED_BY_DEFAULT="yournamehere"
+SCRID_EMAIL_DEFAULT="youremailhere@yahoo.com"
 SCRID_ALPHABET='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 
 scrid_err() {

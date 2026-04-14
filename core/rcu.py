@@ -40,13 +40,17 @@ if [ -d "$SCR_ROOT/aliases/lib" ]; then
 fi
 
 # --- entrypoint ---
-scr() {{
-    "$CORE_DIR/dispatcher.sh" "$@"
-}}
+#scr() {{
+#    "$CORE_DIR/dispatcher.sh" "$@"
+#}}
+#
+#scr0() {{
+#    "$CORE_DIR/editor.sh" "$@"
+#}}
 
-scr0() {{
-    "$CORE_DIR/editor.sh" "$@"
-}}
+scr() {
+    source "$CORE_DIR/scr.sh" "$@"
+}
 
 # --- generated commands ---
 for f in \\

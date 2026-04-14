@@ -1,4 +1,3 @@
-{
 "alsd": "scr_alsd",
 "fin": "scr_fin",
 "id": "scr_id",
@@ -274,5 +273,4 @@
 "klen-json": "scr_klen_json",
 "enhanced_text_manager": "scr_enhanced_text_manager",
 "conflict_flag": "scr_conflict_flag",
-"scrid2": "scr_scrid2"
-}
+"scrid2": "scr_scrid2",

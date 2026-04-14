@@ -36,13 +36,13 @@ scr_tools_menu() { bash "/mnt/c/scr/aliases/bsh/toolsmenu/tools-menu.sh" "$@"; }
 scr_word_replacer_1_3() { bash "/mnt/c/scr/aliases/bsh/wordrep/word-replacer-1.3.sh" "$@"; }
 scr_zscr0() { bash "/mnt/c/scr/aliases/bsh/zscr0.sh" "$@"; }
 scr_boot_env_test() { bash "/mnt/c/scr/aliases/ins/boot-env-test.sh" "$@"; }
+scr_bootstrap_old_scr() { bash "/mnt/c/scr/aliases/ins/bootstrap_old_scr.sh" "$@"; }
 scr_codebrain_heal() { bash "/mnt/c/scr/aliases/ins/codebrain_heal.sh" "$@"; }
 scr_dep_comp() { bash "/mnt/c/scr/aliases/ins/dep_comp.sh" "$@"; }
 scr_dep_con() { bash "/mnt/c/scr/aliases/ins/dep_con.sh" "$@"; }
 scr_fixzshpath() { bash "/mnt/c/scr/aliases/ins/fixzshpath.sh" "$@"; }
-scr_iap() { bash "/mnt/c/scr/aliases/ins/iap.sh" "$@"; }
+scr_git_push() { bash "/mnt/c/scr/aliases/ins/git_push.sh" "$@"; }
 scr_ibun() { bash "/mnt/c/scr/aliases/ins/ibun.sh" "$@"; }
-scr_icmus() { bash "/mnt/c/scr/aliases/ins/icmus.sh" "$@"; }
 scr_ideno() { bash "/mnt/c/scr/aliases/ins/ideno.sh" "$@"; }
 scr_ienv() { bash "/mnt/c/scr/aliases/ins/ienv.sh" "$@"; }
 scr_iffmpeg_msys2() { bash "/mnt/c/scr/aliases/ins/iffmpeg_msys2.sh" "$@"; }

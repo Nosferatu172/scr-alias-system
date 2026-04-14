@@ -1,0 +1,16 @@
+pattern,enabled,notes
+*keys,1,sensitive
+.venv,1,python venv
+*.tar.gz,1,archives
+*demons.csv,1,sensitive
+*military.csv,1,sensitive
+*chinese.csv,1,sensitive
+*dragons.csv,1,sensitive
+*vikings.csv,1,sensitive
+*banshee*,1,personal
+*git*,1,personal
+*pass*,1,personal
+*cookies*,1,personal
+*yt*,1,personal
+*downloads*,1,personal
+*pswgen*,1,personal

@@ -11,8 +11,8 @@ set -u
 
 SCRWORK_ROOT_DEFAULT="/mnt/c/scr"
 SCRWORK_EXTS_DEFAULT="sh,zsh,bash,py,rb"
-SCRWORK_CREATED_BY_DEFAULT="Tyler Jensen"
-SCRWORK_EMAIL_DEFAULT="tylerjensen5@yahoo.com"
+SCRWORK_CREATED_BY_DEFAULT="YournameHere"
+SCRWORK_EMAIL_DEFAULT="youremailhere@yahoo.com"
 SCRWORK_ALPHABET='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 
 # ---------------------------------------------------------
