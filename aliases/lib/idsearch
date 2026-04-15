@@ -1,0 +1,227 @@
+# =========================================================
+# scrids v4 - stable multi-root SCR-ID toolkit
+# =========================================================
+
+if [[ -n "${SCRIDS_LIB_LOADED:-}" ]]; then
+  return 0 2>/dev/null || exit 0
+fi
+SCRIDS_LIB_LOADED=1
+
+# ---------------------------------------------------------
+# CONFIG (🔥 ONLY EDIT THIS SECTION)
+# ---------------------------------------------------------
+
+# Default scan roots (EDIT ONCE - supports 1 or many)
+SCRIDS_ROOTS_DEFAULT=(
+  "/mnt/c/scr/zpy"
+  "/mnt/c/scr/zru"
+)
+
+# Optional override (session-based)
+SCRIDS_ROOTS=("${SCRIDS_ROOTS_OVERRIDE:-${SCRIDS_ROOTS_DEFAULT[@]}}")
+
+# SCR-ID pattern (stable + portable)
+SCRID_REGEX='SCR-ID-[0-9]\{14\}-[A-Za-z0-9]\+'
+
+# File types for missing scan
+SCRIDS_FIND_EXPR=(
+  -name "*.sh" -o
+  -name "*.zsh" -o
+  -name "*.bash" -o
+  -name "*.py" -o
+  -name "*.rb"
+)
+
+# ---------------------------------------------------------
+# HELPERS
+# ---------------------------------------------------------
+
+_scrids_err() {
+  printf '❌ %s\n' "$*" >&2
+}
+
+# FIXED: robust root validation (THIS WAS YOUR BUG)
+_scrids_require_root() {
+  if [[ ${#SCRIDS_ROOTS[@]} -eq 0 ]]; then
+    _scrids_err "No SCRIDS_ROOTS defined"
+    return 1
+  fi
+
+  local ok=0
+  for r in "${SCRIDS_ROOTS[@]}"; do
+    if [[ -d "$r" ]]; then
+      ok=1
+      break
+    fi
+  done
+
+  [[ $ok -eq 1 ]] && return 0
+
+  _scrids_err "Root path missing: ${SCRIDS_ROOTS[*]}"
+  return 1
+}
+
+# Safe opener
+_scrids_open_file() {
+  local file="$1"
+
+  if [[ -n "${EDITOR:-}" ]]; then
+    "$EDITOR" "$file"
+    return
+  fi
+
+  command -v nano >/dev/null && nano "$file" && return
+  command -v vi >/dev/null && vi "$file" && return
+
+  _scrids_err "No editor found. Set \$EDITOR."
+}
+
+# Extract SCR-ID
+_scrids_extract_id() {
+  grep -oE "$SCRID_REGEX"
+}
+
+# ---------------------------------------------------------
+# CORE COMMANDS
+# ---------------------------------------------------------
+
+# Raw SCR-ID mentions
+idall() {
+  _scrids_require_root || return 1
+  grep -Rni --color=auto "SCR-ID" "${SCRIDS_ROOTS[@]}"
+}
+
+# Valid SCR-ID matches
+ids() {
+  _scrids_require_root || return 1
+  grep -Rni --color=auto "$SCRID_REGEX" "${SCRIDS_ROOTS[@]}"
+}
+
+# Files containing valid SCR-ID
+idfiles() {
+  _scrids_require_root || return 1
+  grep -Rli "$SCRID_REGEX" "${SCRIDS_ROOTS[@]}"
+}
+
+# Map: SCR-ID -> file
+idmap() {
+  _scrids_require_root || return 1
+
+  ids | while IFS= read -r line; do
+    file="${line%%:*}"
+    id="$(echo "$line" | _scrids_extract_id | head -n1)"
+    [[ -n "$id" ]] && echo "$id $file"
+  done
+}
+
+# Sorted map
+idsort() {
+  idmap | sort
+}
+
+# Find by ID or text
+idfind() {
+  _scrids_require_root || return 1
+
+  [[ $# -lt 1 ]] && {
+    _scrids_err "Usage: idfind <SCR-ID or text>"
+    return 1
+  }
+
+  grep -Rli --color=never "$1" "${SCRIDS_ROOTS[@]}"
+}
+
+# Open first match
+ido() {
+  _scrids_require_root || return 1
+
+  [[ $# -lt 1 ]] && {
+    _scrids_err "Usage: ido <SCR-ID or text>"
+    return 1
+  }
+
+  local f
+  f="$(grep -Rli --color=never "$1" "${SCRIDS_ROOTS[@]}" | head -n 1)"
+
+  [[ -z "$f" ]] && {
+    _scrids_err "No file found for: $1"
+    return 1
+  }
+
+  _scrids_open_file "$f"
+}
+
+# Duplicate SCR-IDs
+iddupes() {
+  _scrids_require_root || return 1
+
+  idmap | awk '{print $1}' | sort | uniq -d
+}
+
+# Files missing SCR-ID
+idmissing() {
+  _scrids_require_root || return 1
+
+  find "${SCRIDS_ROOTS[@]}" -type f \( "${SCRIDS_FIND_EXPR[@]}" \) \
+    -exec grep -L "$SCRID_REGEX" {} +
+}
+
+# JSON output
+idjson() {
+  _scrids_require_root || return 1
+
+  ids | while IFS= read -r line; do
+    file="${line%%:*}"
+    id="$(echo "$line" | _scrids_extract_id | head -n1)"
+    [[ -n "$id" ]] && printf '{"id":"%s","file":"%s"}\n' "$id" "$file"
+  done
+}
+
+# ---------------------------------------------------------
+# OPTIONAL: runtime override
+# ---------------------------------------------------------
+iduse() {
+  SCRIDS_ROOTS=("$@")
+}
+
+# ---------------------------------------------------------
+# HELP
+# ---------------------------------------------------------
+idhelp() {
+  cat <<EOF
+SCR-ID Toolkit v4
+
+🔥 EDIT ONLY THIS:
+SCRIDS_ROOTS_DEFAULT=("/d/scr-pac")
+
+Supports:
+  - single directory
+  - multiple directories
+
+Optional runtime override:
+  iduse /path1 /path2
+
+Commands:
+  idall
+  ids
+  idfiles
+  idmap
+  idsort
+  idfind X
+  ido X
+  iddupes
+  idmissing
+  idjson
+  iduse
+EOF
+}
+
+# ---------------------------------------------------------
+# ALIASES
+# ---------------------------------------------------------
+alias id-all='idall'
+alias id-files='idfiles'
+alias id-map='idmap'
+alias id-sort='idsort'
+alias id-dupes='iddupes'
+alias id-missing='idmissing'

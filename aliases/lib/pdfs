@@ -1,0 +1,28 @@
+# =========================================================================================
+# [ PDF & TEXT FILE OPS ]
+# =========================================================================================
+# Created By: Tyler Jensen
+# Email: tylerjensen5@yahoo.com
+# Date: 08/27/2025
+# Version: 01/22/0001
+# =======================================================================================
+# To View Commands Type In "als."
+# =======================================================================================
+# Commands to find this Page:
+# [als]
+alias alspdf="less /mnt/c/scr/aliases/lib/act/pdfs"
+alias e-alspdf="nano /mnt/c/scr/aliases/lib/act/pdfs"
+# [/als]
+# ---------------------------------------------------------------------------------------
+# Commands:
+# [fileops]
+alias combinepdf="pdftk *.pdf cat output combined.pdf"
+alias seppdf="pdftk *.pdf burst"
+alias pdf2jpg1='mkdir -p jpg_output && for file in *.pdf; do pdftoppm "$file" "jpg_output/${file%.pdf}" -jpeg; done'
+alias pdf2jpg2='for file in *.pdf; do convert -density 300 "$file" -quality 100 "${file%.pdf}.jpg"; done'
+alias pdf2jpg3='output_dir="jpg_output_$(date +%Y%m%d_%H%M%S)"; mkdir -p "$output_dir" && for file in *.pdf; do pdftoppm "$file" "$output_dir/${file%.pdf}" -jpeg; done'
+
+# Image combining.
+alias combinejpg="img2pdf *.jpg -o combined.pdf && rm *.jpg"
+alias combineimages='img2pdf $(ls *.jpg *.png) -o combined_images.pdf'
+# [fileops]

@@ -1,0 +1,266 @@
+# =========================================================
+# Script Name: vpy
+# ID: SCR-ID-20260317103749-PCJS95E8PG
+# Assigned with: n/a
+# Created by: Tyler Jensen
+# Email: tylerjensen5@yahoo.com
+# Alias Call: vpy
+# vpy
+# Single-file shell-loaded Python venv controller
+#
+# Put this file in:
+#   /mnt/c/scr/aliases/lib/vpy
+#
+# Then source that folder from ~/.zshrc or ~/.bashrc
+#
+# This file defines:
+#   vpy
+#
+# Behavior:
+
+# - vpy on  -> activate nearest venv upward
+# - if none exists, create .venv in current directory and activate it
+# - activation/deactivation happen in the CURRENT shell
+# vpy - fixed + consistent version
+# =========================================================
+
+if [[ -n "${VPY_LIB_LOADED:-}" ]]; then
+  return 0 2>/dev/null || exit 0
+fi
+VPY_LIB_LOADED=1
+
+VPY_DEFAULT_NAMES=".venv venv env"
+VPY_ACTIVE_PATH=""
+VPY_ACTIVE_PYTHON=""
+VPY_ACTIVE_PIP=""
+
+# --------------------------------------------------
+# utils
+# --------------------------------------------------
+
+_vpy_echo() { printf '%s\n' "$*"; }
+_vpy_err()  { printf '❌ %s\n' "$*" >&2; }
+_vpy_ok()   { printf '✅ %s\n' "$*"; }
+_vpy_warn() { printf '⚠️ %s\n' "$*"; }
+
+_vpy_cmd_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+_vpy_realpath_fallback() {
+  if _vpy_cmd_exists realpath; then
+    realpath "$1" 2>/dev/null && return 0
+  fi
+  python3 - <<'PY' "$1" 2>/dev/null
+import os, sys
+print(os.path.realpath(sys.argv[1]))
+PY
+}
+
+_vpy_get_caller_pwd() {
+  if [[ -n "${SCR_CALLER_PWD:-}" && -d "${SCR_CALLER_PWD:-}" ]]; then
+    printf '%s\n' "$SCR_CALLER_PWD"
+  else
+    pwd
+  fi
+}
+
+# --------------------------------------------------
+# VALIDATION
+# --------------------------------------------------
+
+_vpy_is_valid_venv() {
+  local d="$1"
+  [[ -d "$d" ]] || return 1
+  [[ -f "$d/bin/activate" ]] && return 0
+  [[ -x "$d/bin/python" ]] && return 0
+  return 1
+}
+
+# --------------------------------------------------
+# FINDING
+# --------------------------------------------------
+
+_vpy_find_up() {
+  local start dir name real
+
+  start="${1:-$(_vpy_get_caller_pwd)}"
+  [[ -d "$start" ]] || return 1
+
+  real="$(_vpy_realpath_fallback "$start")"
+
+  # 1. current dir
+  for name in $VPY_DEFAULT_NAMES; do
+    if _vpy_is_valid_venv "$real/$name"; then
+      printf '%s\n' "$real/$name"
+      return 0
+    fi
+  done
+
+  # 2. upward
+  dir="$(dirname "$real")"
+  while :; do
+    for name in $VPY_DEFAULT_NAMES; do
+      if _vpy_is_valid_venv "$dir/$name"; then
+        printf '%s\n' "$dir/$name"
+        return 0
+      fi
+    done
+    [[ "$dir" == "/" ]] && break
+    dir="$(dirname "$dir")"
+  done
+
+  # 3. active env
+  if [[ -n "${VIRTUAL_ENV:-}" ]] && _vpy_is_valid_venv "$VIRTUAL_ENV"; then
+    printf '%s\n' "$VIRTUAL_ENV"
+    return 0
+  fi
+
+  # 4. fallback
+  if _vpy_is_valid_venv "$HOME/.venv"; then
+    printf '%s\n' "$HOME/.venv"
+    return 0
+  fi
+
+  return 1
+}
+
+_vpy_find_here() {
+  local dir name
+  dir="${1:-$(_vpy_get_caller_pwd)}"
+
+  for name in $VPY_DEFAULT_NAMES; do
+    if _vpy_is_valid_venv "$dir/$name"; then
+      printf '%s\n' "$dir/$name"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# --------------------------------------------------
+# ACTIVATE
+# --------------------------------------------------
+
+_vpy_activate_path() {
+  local venv_dir="$1"
+  local activate_path="$venv_dir/bin/activate"
+
+  [[ -f "$activate_path" ]] || {
+    _vpy_err "Invalid venv: $venv_dir"
+    return 1
+  }
+
+  if [[ -n "${VIRTUAL_ENV:-}" ]] && type deactivate >/dev/null 2>&1; then
+    deactivate >/dev/null 2>&1
+  fi
+
+  source "$activate_path" || return 1
+
+  VPY_ACTIVE_PATH="$venv_dir"
+  VPY_ACTIVE_PYTHON="$venv_dir/bin/python"
+  VPY_ACTIVE_PIP="$venv_dir/bin/pip"
+
+  _vpy_ok "Activated: $venv_dir"
+}
+
+# --------------------------------------------------
+# CREATE
+# --------------------------------------------------
+
+_vpy_python_choice() {
+  for c in python3.13 python3.12 python3.11 python3.10 python3; do
+    _vpy_cmd_exists "$c" && { echo "$c"; return; }
+  done
+  return 1
+}
+
+_vpy_make() {
+  local dir="${1:-$(_vpy_get_caller_pwd)}"
+  local py="$(_vpy_python_choice)" || return 1
+  local venv_dir="$dir/.venv"
+
+  _vpy_echo "[make] using interpreter: $py"
+  "$py" -m venv "$venv_dir" || return 1
+
+  _vpy_ok "Created venv: $venv_dir"
+  _vpy_activate_path "$venv_dir"
+}
+
+# --------------------------------------------------
+# TURN ON
+# --------------------------------------------------
+
+_vpy_turn_on() {
+  local cwd="$(_vpy_get_caller_pwd)"
+  local found="$(_vpy_find_up "$cwd")"
+
+  if [[ -n "$found" ]]; then
+    _vpy_activate_path "$found"
+    return
+  fi
+
+  _vpy_warn "No venv found. Creating .venv in: $cwd"
+  _vpy_make "$cwd"
+}
+
+# --------------------------------------------------
+# REMOVE
+# --------------------------------------------------
+
+_vpy_remove() {
+  local target
+
+  target="$(_vpy_find_here)" || target="$(_vpy_find_up)"
+
+  [[ -z "$target" ]] && {
+    _vpy_err "No venv found to remove."
+    return 1
+  }
+
+  if [[ "$target" == "$VIRTUAL_ENV" ]]; then
+    deactivate 2>/dev/null
+  fi
+
+  rm -rf "$target"
+  _vpy_ok "Removed venv: $target"
+}
+
+# --------------------------------------------------
+# DEBUG
+# --------------------------------------------------
+
+_vpy_debug() {
+  local dir="$(_vpy_get_caller_pwd)"
+  echo "🔍 debug search from: $dir"
+
+  while :; do
+    for n in $VPY_DEFAULT_NAMES; do
+      echo "checking: $dir/$n"
+    done
+    [[ "$dir" == "/" ]] && break
+    dir="$(dirname "$dir")"
+  done
+}
+
+# --------------------------------------------------
+# MAIN
+# --------------------------------------------------
+
+vpy() {
+  case "$1" in
+    on) _vpy_turn_on ;;
+    off)
+      if type deactivate >/dev/null 2>&1; then
+        deactivate
+        _vpy_ok "Deactivated venv."
+      fi
+      ;;
+    find)
+      _vpy_find_here || _vpy_find_up || _vpy_err "No venv found."
+      ;;
+    rm) _vpy_remove ;;
+    debug) _vpy_debug ;;
+    *) echo "Usage: vpy [on|off|find|rm|debug]" ;;
+  esac
+}

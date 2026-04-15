@@ -1,0 +1,5 @@
+aliases=/mnt/c/scr/core/index/generated/bash/aliases.sh
+bsh=/mnt/c/scr/core/index/generated/bsh/bsh.sh
+tools=/mnt/c/scr/core/index/generated/python/tools.sh
+tools=/mnt/c/scr/core/index/generated/ruby/tools.sh
+tools=/mnt/c/scr/core/index/generated/zsh/tools.sh

@@ -1,0 +1,5 @@
+source "/mnt/c/scr/core/index/generated/bash/aliases.sh"
+source "/mnt/c/scr/core/index/generated/bsh/bsh.sh"
+source "/mnt/c/scr/core/index/generated/python/tools.sh"
+source "/mnt/c/scr/core/index/generated/ruby/tools.sh"
+source "/mnt/c/scr/core/index/generated/zsh/tools.sh"

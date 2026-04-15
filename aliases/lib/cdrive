@@ -1,0 +1,74 @@
+# Script Name: cdrive
+# ID: SCR-ID-20260317103613-7ELXAZOX76
+# Assigned with: n/a
+# Created by: Tyler Jensen
+# Email: tylerjensen5@yahoo.com
+# Alias Call: c-cdrive
+# ======================================================================================= 
+# Commands to find this Page: Press "q" to Exit Page [als]
+alias alsff="less /mnt/c/scr/aliases/lib/cdrive"
+alias e-alsff="nano /mnt/c/scr/aliases/lib/cdrive"
+# [/als]
+# ---------------------------------------------------------------------------------------
+# Commands: (EXAMPLES)
+# ---------------------------------------------------------------------------------------
+# alias bshname="bash /mnt/c/scr/"	|	alias als1="b0 /mnt/c/scr/"
+# alias pyname="python3 /mnt/c/scr/"	|	alias als2="p0 /mnt/c/scr/"
+# alias rname="ruby /mnt/c/scr/" 	|	alias als3="r0 /mnt/c/scr/"
+# ---------------------------------------------------------------------------------------
+# Commands: (ACTIVE)
+# [winfolders]
+# ---------------------------------------------------------------------------------------
+# WINDOWS FOLDERS
+# ---------------------------------------------------------------------------------------
+
+alias alsbshf='cd /mnt/c/scr/aliases/bsh/ && ls'
+alias alsbashf='cd /mnt/c/scr/aliases/bash/ && ls'
+alias cookiesf='cd /mnt/c/scr/key/cookies/ && ls'
+
+#alias brave='cd "$WINPROFILE/Documents/brave/" && l'
+#alias brave='[ -d "$WINPROFILE/Documents/mine/brave" ] && cd "$WINPROFILE/Documents/mine/brave" && l || echo "Path not found"'
+
+#alias usermain='cd "$WINPROFILE/" && l'
+#alias desktopf='cd "$WINPROFILE/Desktop/" && l'
+#alias docsf='cd "$WINPROFILE/Documents/" && l'
+#alias downsf='cd "$WINPROFILE/Downloads/" && l'
+#alias musikf='cd "$WINPROFILE/Music/clm/" && l'
+#alias musicf='cd "$WINPROFILE/Music/clm/" && l'
+#alias actmf='cd "$WINPROFILE/Music/clm/Active-org/"'
+#alias picsf='cd "$WINPROFILE/Pictures/" && l'
+#alias screenshotsf='cd "$WINPROFILE/Pictures/Screenshots/" && l'
+#alias newvidsf='cd "$WINPROFILE/Videos/clm/new/" && l'
+#alias videosf='cd "$WINPROFILE/Videos/clm/" && l'
+
+alias homed='cd "/mnt/d/Wyvern/" && ls'
+alias deskf='cd "/mnt/d/Wyvern/Desktop/" && ls'
+alias docsf='cd "/mnt/d/Wyvern/Documents/" && ls'
+alias downf='cd "/mnt/d/Wyvern/Downloads/" && ls'
+alias musikf='cd "/mnt/d/Wyvern/Music/clm/" && ls'
+alias musicf='cd "/mnt/d/Wyvern/Music/clm2/" && ls'
+alias actf='cd "/mnt/d/Wyvern/Music/clm/org/" && ls'
+alias picsf='cd "/mnt/d/Wyvern/Pictures/" && ls'
+alias shotsf='cd "/mnt/d/Wyvern/Pictures/Screenshots/" && ls'
+alias newvidsf='cd "/mnt/d/Wyvern/Videos/clm/new/" && ls'
+alias vidsf='cd "/mnt/d/Wyvern/Videos/clm/" && ls'
+
+# ---------------------------------------------------------------------------------------
+# SCR / TOOLS
+# ---------------------------------------------------------------------------------------
+
+alias indf='cd /mnt/c/scr/core/index/generated/ && ls'
+alias ytf='cd /mnt/c/scr/zru/banshee26/ && ls'
+alias ytf0='cd /mnt/c/scr/zru/banshee27/ && ls'
+alias insf='cd /mnt/c/scr/bsh/installs/ && ls && ~'
+alias alsf='cd /mnt/c/scr/aliases/ && ls'
+alias bshf='cd /mnt/c/scr/bsh/ && ls'
+alias coref='cd /mnt/c/scr/core/ && ls'
+alias genf='cd /mnt/c/scr/core/index/generated/ && ls'
+alias toolsf='cd /mnt/c/scr/aliases/tools/ && ls'
+alias scrf='cd /mnt/c/scr/ && ls'
+alias ruf='cd /mnt/c/scr/zru/ && ls'
+alias pyf='cd /mnt/c/scr/zpy/ && ls'
+alias crackf='cd /mnt/c/scr/keys/crack/ && tree'
+alias ftpf='cd /mnt/c/scr/keys/ftp0/ && ls'
+# [/winfolders]

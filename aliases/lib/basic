@@ -1,0 +1,91 @@
+# Script Name: basic
+# ID: SCR-ID-20260315115917-M2F57YIVLH
+# Assigned with: 
+# Created by: Tyler Jensen
+# Email: tylerjensen5@yahoo.com
+# Alias Call: "alsb" or to edit this file "e-alsb" or "ealsb"
+# ----------------------------
+# ALIAS SYSTEM ROOT
+# ----------------------------
+export ALSHOME="/mnt/c/scr/aliases/lib"
+
+alias alsb="less $ALSHOME/basic"
+alias e-alsb="nano $ALSHOME/basic"
+alias newals="nano $ALSHOME/newals"
+# to show this folder
+#alias ne='idtodo -n 1 -l bash --names-only'
+#alias ne='idtodo -n 1 -l ruby --names-only'
+#alias ne='idtodo -n 1 -l python --names-only'
+# use fin to find the script
+#alias op='vf && n'
+# Press "q" to Exit Page
+# Cleaned alias file for dynamic resolver setup
+
+# Shell helpers
+alias r='exec "$SHELL"'
+alias rl='for f in /mnt/c/scr/aliases/lib/*; do [ -f "$f" ] && source "$f"; done && c'
+alias c="clear"
+#alias ls='ls --color=auto'
+alias l='ls -al --color=auto'
+alias u='sudo apt-get update -y && sudo apt-get -y full-upgrade'
+alias n='nano'
+alias e='exit'
+alias a='aptitude'
+alias cd..='cd ..'
+alias i='sudo apt-get install'
+alias f='grep -rni'
+alias b='..'
+alias s='sudo -i'
+alias pi="pip install"
+alias are="sudo apt autoremove -y"
+alias re='sudo apt autoremove'
+alias rem='rm -R logs'
+alias gi='gem install'
+alias gu='gem uninstall'
+alias gv='gem --version'
+alias rv='ruby -v'
+# Shell helpers
+alias r='exec "$SHELL"'
+alias rl='for f in /mnt/c/scr/aliases/lib/*; do [ -f "$f" ] && source "$f"; done && c'
+alias c="clear"
+#alias ls='ls --color=auto'
+alias pl='ls -lah'
+
+# 🔁 MSYS2 Package Management
+alias pacu='pacman -Syu --noconfirm'
+alias paci='pacman -S'
+alias pacare='pacman -Rns $(pacman -Qtdq 2>/dev/null)'
+alias pacre='pacman -Rns'
+
+# Removed aptitude (not available in MSYS2)
+# alias a='aptitude'
+
+# General
+alias n='nano'
+alias e='exit'
+alias cd..='cd ..'
+alias f='grep -rni'
+alias b='cd ..'
+
+alias pipi="pip install"
+alias rem='rm -rf logs'
+
+# Shell switch (⚠️ MSYS2 doesn't use chsh the same way)
+alias st="touch ~/.hushlogin && chsh -s $(which zsh)"
+
+# Scripts
+alias setr='cd /mnt/c/scr/core/ && rm rcn.txt && cp rcn.txt.bak rcn.txt'
+alias bkrcn='cd /mnt/c/scr/core/ && cp rcn.txt rcn.txt.bak && cp rcn.txt rcn.txt.bak.bak'
+
+# Tabs
+alias tb='nano /mnt/c/scr/keys/tabs/brave/exported-tabs.txt'
+alias dt='rm /mnt/c/scr/keys/tabs/brave/exported-tabs.txt'
+alias tabs='cd /mnt/c/scr/keys/tabs/brave && ls -lah'
+
+# Interpreters
+alias r0="ruby"
+alias p0="python3"
+alias b0="bash"
+
+# Cleanup
+alias cleanpyc='find . -name "*.pyc" -delete'

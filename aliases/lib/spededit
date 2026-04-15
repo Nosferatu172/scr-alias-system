@@ -1,0 +1,185 @@
+sedit() {
+  local root=""
+  local type="all"
+  local pause=0
+  local menu=0
+
+  # ---------------------------------------------------------
+  # HELP
+  # ---------------------------------------------------------
+  sedit_help() {
+    cat <<'EOF'
+
+sedit - sequential file walker (nano-based)
+
+USAGE:
+  sedit -a [type]        Walk current directory tree
+  sedit <dir> [type]     Walk specific directory
+  sedit -h               Show help
+
+FLAGS:
+  -a     Active directory (current folder tree)
+  -p     Pause between files (press Enter)
+  -m     Manual selection menu (optional fallback)
+  -h     Help
+
+TYPES:
+  py | python
+  rb | ruby
+  sh | bash
+  zsh
+  txt
+  log | logs
+  csv
+  all (default)
+
+EXAMPLES:
+  sedit -a py
+  sedit -a all
+  sedit /d/scr-pac rb
+  sedit -a py -p
+  sedit -a py -m
+
+BEHAVIOR:
+  - Opens files in nano one by one
+  - Exiting nano automatically goes to next file
+  - Ctrl+C aborts entire session immediately
+
+EOF
+  }
+
+  # ---------------------------------------------------------
+  # ARG PARSING
+  # ---------------------------------------------------------
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -a)
+        root="."
+        shift
+        ;;
+      -p)
+        pause=1
+        shift
+        ;;
+      -m)
+        menu=1
+        shift
+        ;;
+      -h|--help)
+        sedit_help
+        return 0
+        ;;
+      *)
+        if [[ -z "$root" ]]; then
+          root="$1"
+        else
+          type="$1"
+        fi
+        shift
+        ;;
+    esac
+  done
+
+  [[ -z "$root" ]] && root="."
+  [[ -d "$root" ]] || {
+    echo "Directory not found: $root"
+    return 1
+  }
+
+  # ---------------------------------------------------------
+  # TYPE FILTER
+  # ---------------------------------------------------------
+  local exts=""
+  case "$type" in
+    py|python)   exts="py" ;;
+    rb|ruby)     exts="rb" ;;
+    sh|bash)     exts="sh bash" ;;
+    zsh)         exts="zsh" ;;
+    txt)         exts="txt" ;;
+    log|logs)    exts="log" ;;
+    csv)         exts="csv" ;;
+    all)
+      exts="py rb sh bash zsh txt log csv"
+      ;;
+    *)
+      echo "Unknown type: $type"
+      return 1
+      ;;
+  esac
+
+  # ---------------------------------------------------------
+  # BUILD FIND EXPRESSION
+  # ---------------------------------------------------------
+  local find_expr=()
+  local first=1
+  local e
+
+  for e in $exts; do
+    if [[ $first -eq 1 ]]; then
+      find_expr+=( -iname "*.$e" )
+      first=0
+    else
+      find_expr+=( -o -iname "*.$e" )
+    fi
+  done
+
+  # ---------------------------------------------------------
+  # COLLECT FILES
+  # ---------------------------------------------------------
+  local files=()
+  while IFS= read -r f; do
+    files+=("$f")
+  done < <(find "$root" -type f \( "${find_expr[@]}" \) 2>/dev/null | sort)
+
+  if [[ ${#files[@]} -eq 0 ]]; then
+    echo "No matching files found in: $root"
+    return 1
+  fi
+
+  echo "Scanning: $root"
+  echo "Found ${#files[@]} files"
+  echo
+
+  # ---------------------------------------------------------
+  # CTRL+C HANDLER
+  # ---------------------------------------------------------
+  trap "echo; echo 'sedit aborted.'; return 1" INT
+
+  # ---------------------------------------------------------
+  # MANUAL MODE (OPTIONAL)
+  # ---------------------------------------------------------
+  if [[ $menu -eq 1 ]]; then
+    local i=1
+    for f in "${files[@]}"; do
+      printf "%3d) %s\n" "$i" "$f"
+      ((i++))
+    done
+
+    echo
+    echo -n "Select file number: "
+    read -r choice
+
+    [[ "$choice" =~ ^[0-9]+$ ]] || return 1
+    (( choice >= 1 && choice <= ${#files[@]} )) || return 1
+
+    nano "${files[$((choice - 1))]}"
+    return 0
+  fi
+
+  # ---------------------------------------------------------
+  # DEFAULT: WALK MODE (THIS IS THE MAIN FEATURE)
+  # ---------------------------------------------------------
+  local f
+
+  for f in "${files[@]}"; do
+    echo "Opening: $f"
+    nano "$f"
+
+    if [[ $pause -eq 1 ]]; then
+      echo
+      read -r -p "Press Enter for next file (Ctrl+C to stop)..." _
+    fi
+  done
+
+  echo "Done walking all files."
+}
